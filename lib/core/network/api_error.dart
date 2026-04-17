@@ -27,7 +27,7 @@ class ApiError implements Exception {
       case DioExceptionType.receiveTimeout:
         return ApiError(
           message:
-              'Connection timeout. For physical Android device, set API_BASE_URL to your PC LAN IP (example: http://192.168.1.36:3000).',
+              'Connection timeout. Android emulator uses 10.0.2.2:3000, while physical Android must use PC LAN IP via --dart-define=API_BASE_URL=http://<PC_IP>:3000.',
           statusCode: statusCode,
         );
       case DioExceptionType.connectionError:
