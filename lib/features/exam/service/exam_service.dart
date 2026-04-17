@@ -107,6 +107,112 @@ class ExamService {
     }
   }
 
+  Future<List<AdminQuestion>> listQuestionsBySubject(String subjectId) async {
+    try {
+      final response = await _dio.get<dynamic>('/api/subjects/$subjectId/questions');
+      final data = response.data;
+      if (data is List<dynamic>) {
+        return data
+            .whereType<Map<String, dynamic>>()
+            .map(AdminQuestion.fromJson)
+            .toList();
+      }
+      throw ApiError(message: 'Daftar pertanyaan belum bisa dimuat.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<AdminQuestion> createQuestion({
+    required String subjectId,
+    required String text,
+    required num weight,
+    required List<AdminQuestionOption> options,
+    required String correctAnswer,
+  }) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/api/questions',
+        data: <String, dynamic>{
+          'subjectId': subjectId,
+          'type': 'single',
+          'text': text,
+          'options': options.map((item) => item.toJson()).toList(),
+          'correctAnswer': correctAnswer,
+          'weight': weight,
+        },
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return AdminQuestion.fromJson(data);
+      }
+      throw ApiError(message: 'Pertanyaan belum berhasil dibuat.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<AdminQuestion> updateQuestion({
+    required String id,
+    required String text,
+    required num weight,
+    required List<AdminQuestionOption> options,
+    required String correctAnswer,
+  }) async {
+    try {
+      final response = await _dio.put<dynamic>(
+        '/api/questions/$id',
+        data: <String, dynamic>{
+          'type': 'single',
+          'text': text,
+          'options': options.map((item) => item.toJson()).toList(),
+          'correctAnswer': correctAnswer,
+          'weight': weight,
+        },
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return AdminQuestion.fromJson(data);
+      }
+      throw ApiError(message: 'Perubahan pertanyaan belum berhasil disimpan.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<void> deleteQuestion(String id) async {
+    try {
+      await _dio.delete<dynamic>('/api/questions/$id');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<List<AdminQuestion>> reorderQuestions({
+    required String subjectId,
+    required List<String> orderedQuestionIds,
+  }) async {
+    try {
+      final response = await _dio.put<dynamic>(
+        '/api/questions/reorder',
+        data: <String, dynamic>{
+          'subjectId': subjectId,
+          'orderedQuestionIds': orderedQuestionIds,
+        },
+      );
+      final data = response.data;
+      if (data is List<dynamic>) {
+        return data
+            .whereType<Map<String, dynamic>>()
+            .map(AdminQuestion.fromJson)
+            .toList();
+      }
+      throw ApiError(message: 'Urutan pertanyaan belum berhasil diperbarui.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
   Future<StartAttemptResponse> startAttempt({
     required String examId,
     required String subjectId,

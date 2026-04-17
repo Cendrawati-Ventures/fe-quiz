@@ -217,9 +217,9 @@ class _AdminSubjectEditScreenState extends ConsumerState<AdminSubjectEditScreen>
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => AppCard(
+          error: (_, __) => const AppCard(
             title: 'Gagal memuat subject',
-            subtitle: error.toString(),
+            subtitle: 'Data subject belum bisa dimuat. Coba lagi sebentar.',
           ),
         ),
       ),

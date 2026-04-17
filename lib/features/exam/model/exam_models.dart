@@ -1,5 +1,15 @@
 import '../../auth/model/auth_user.dart';
 
+num _readNum(dynamic value) {
+  if (value is num) {
+    return value;
+  }
+  if (value is String) {
+    return num.tryParse(value) ?? 0;
+  }
+  return 0;
+}
+
 enum QuestionType { single, multi, group }
 
 QuestionType questionTypeFromString(String value) {
@@ -216,7 +226,7 @@ class ApiQuestion {
       type: questionTypeFromString(json['type'] as String),
       text: json['text'] as String,
       options: json['options'],
-      weight: (json['weight'] as num?) ?? 0,
+      weight: _readNum(json['weight']),
     );
   }
 
@@ -229,6 +239,119 @@ class ApiQuestion {
       'options': options,
       'weight': weight,
     };
+  }
+}
+
+class AdminQuestionOption {
+  const AdminQuestionOption({
+    required this.value,
+    required this.label,
+  });
+
+  final String value;
+  final String label;
+
+  factory AdminQuestionOption.fromJson(Map<String, dynamic> json) {
+    return AdminQuestionOption(
+      value: (json['value'] as String? ?? '').trim(),
+      label: (json['label'] as String? ?? '').trim(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'value': value,
+      'label': label,
+    };
+  }
+}
+
+class AdminQuestion {
+  const AdminQuestion({
+    required this.id,
+    required this.subjectId,
+    required this.type,
+    required this.text,
+    required this.options,
+    required this.correctAnswer,
+    required this.weight,
+    required this.orderIndex,
+  });
+
+  final String id;
+  final String subjectId;
+  final QuestionType type;
+  final String text;
+  final List<AdminQuestionOption> options;
+  final String correctAnswer;
+  final num weight;
+  final int orderIndex;
+
+  factory AdminQuestion.fromJson(Map<String, dynamic> json) {
+    final rawOptions = json['options'];
+    final options = _parseAdminQuestionOptions(rawOptions);
+    final fallbackCorrectAnswer =
+        options.isNotEmpty ? options.first.value : 'A';
+    final rawCorrectAnswer = json['correctAnswer'];
+
+    return AdminQuestion(
+      id: json['id'] as String,
+      subjectId: json['subjectId'] as String,
+      type: questionTypeFromString(json['type'] as String? ?? 'single'),
+      text: (json['text'] as String? ?? '').trim(),
+      options: options,
+      correctAnswer: rawCorrectAnswer is String && rawCorrectAnswer.trim().isNotEmpty
+          ? rawCorrectAnswer
+          : fallbackCorrectAnswer,
+      weight: _readNum(json['weight']),
+      orderIndex: _readNum(json['orderIndex']).toInt(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'subjectId': subjectId,
+      'type': questionTypeToString(type),
+      'text': text,
+      'options': options.map((item) => item.toJson()).toList(),
+      'correctAnswer': correctAnswer,
+      'weight': weight,
+      'orderIndex': orderIndex,
+    };
+  }
+
+  static List<AdminQuestionOption> _parseAdminQuestionOptions(dynamic raw) {
+    final result = <AdminQuestionOption>[];
+    if (raw is List<dynamic>) {
+      for (final item in raw) {
+        if (item is Map<String, dynamic>) {
+          final parsed = AdminQuestionOption.fromJson(item);
+          if (parsed.value.isNotEmpty && parsed.label.isNotEmpty) {
+            result.add(parsed);
+          }
+        }
+      }
+    } else if (raw is Map<String, dynamic>) {
+      raw.forEach((key, value) {
+        final label = value?.toString().trim() ?? '';
+        final optionValue = key.trim();
+        if (optionValue.isNotEmpty && label.isNotEmpty) {
+          result.add(AdminQuestionOption(value: optionValue, label: label));
+        }
+      });
+    }
+
+    if (result.isEmpty) {
+      return const <AdminQuestionOption>[
+        AdminQuestionOption(value: 'A', label: 'Opsi A'),
+        AdminQuestionOption(value: 'B', label: 'Opsi B'),
+        AdminQuestionOption(value: 'C', label: 'Opsi C'),
+        AdminQuestionOption(value: 'D', label: 'Opsi D'),
+      ];
+    }
+
+    return result;
   }
 }
 

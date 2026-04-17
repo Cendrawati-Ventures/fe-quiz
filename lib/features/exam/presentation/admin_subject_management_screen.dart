@@ -89,9 +89,9 @@ class _AdminSubjectManagementScreenState
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, _) => AppCard(
+                error: (_, __) => const AppCard(
                   title: 'Gagal memuat subject',
-                  subtitle: error.toString(),
+                  subtitle: 'Data subject belum bisa dimuat. Coba lagi sebentar.',
                 ),
               ),
             ),

@@ -76,6 +76,21 @@ class ApiError implements Exception {
     if (normalized.contains('attempt limit reached')) {
       return 'Batas percobaan untuk subject ini sudah habis.';
     }
+    if (normalized.contains('maksimum 30 soal')) {
+      return 'Jumlah pertanyaan maksimal 30 untuk satu subject.';
+    }
+    if (normalized.contains('total weight')) {
+      return 'Total poin pertanyaan melebihi batas.';
+    }
+    if (normalized.contains('question not found')) {
+      return 'Pertanyaan tidak ditemukan.';
+    }
+    if (normalized.contains('opsi soal')) {
+      return 'Opsi jawaban belum sesuai.';
+    }
+    if (normalized.contains('jawaban benar')) {
+      return 'Jawaban benar belum sesuai dengan opsi.';
+    }
     if (normalized.contains('validation error')) {
       return 'Data yang dimasukkan belum sesuai.';
     }

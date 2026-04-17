@@ -45,9 +45,9 @@ class AdminResultMonitoringScreen extends ConsumerWidget {
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, _) => AppCard(
+                error: (_, __) => const AppCard(
                   title: 'Gagal memuat result',
-                  subtitle: error.toString(),
+                  subtitle: 'Data hasil belum bisa dimuat. Coba lagi sebentar.',
                 ),
               ),
             ),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/state/auth_provider.dart';
 import '../features/exam/presentation/admin_dashboard_screen.dart';
+import '../features/exam/presentation/admin_question_edit_screen.dart';
 import '../features/exam/presentation/admin_subject_edit_screen.dart';
 import '../features/exam/presentation/admin_question_management_screen.dart';
 import '../features/exam/presentation/admin_result_monitoring_screen.dart';
@@ -72,7 +73,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/questions',
         name: 'admin-questions',
-        builder: (context, state) => const AdminQuestionManagementScreen(),
+        builder: (context, state) {
+          final initialSubjectId = state.uri.queryParameters['subjectId'];
+          return AdminQuestionManagementScreen(
+            initialSubjectId: initialSubjectId,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/admin/questions/:subjectId/:questionId/edit',
+        name: 'admin-question-edit',
+        builder: (context, state) {
+          final subjectId = state.pathParameters['subjectId']!;
+          final questionId = state.pathParameters['questionId']!;
+          return AdminQuestionEditScreen(
+            subjectId: subjectId,
+            questionId: questionId,
+          );
+        },
       ),
       GoRoute(
         path: '/admin/results',
