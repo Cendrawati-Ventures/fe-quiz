@@ -17,6 +17,8 @@ class BottomActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     final content = Container(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -25,12 +27,19 @@ class BottomActionBar extends StatelessWidget {
         AppSpacing.md,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: scheme.surface,
         border: Border(
           top: BorderSide(
-            color: Theme.of(context).dividerColor,
+            color: scheme.outlineVariant,
           ),
         ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: Row(
         children: <Widget>[

@@ -22,6 +22,7 @@ class AppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final style = _resolveStyle(scheme);
+    final progressColor = _progressColor(scheme);
 
     return SizedBox(
       width: double.infinity,
@@ -29,10 +30,13 @@ class AppButton extends StatelessWidget {
         style: style,
         onPressed: (loading || disabled) ? null : onPressed,
         child: loading
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                ),
               )
             : Text(label),
       ),
@@ -43,27 +47,48 @@ class AppButton extends StatelessWidget {
     switch (variant) {
       case AppButtonVariant.primary:
         return ElevatedButton.styleFrom(
+          backgroundColor: scheme.primary,
+          foregroundColor: scheme.onPrimary,
+          shadowColor: scheme.primary.withValues(alpha: 0.35),
+          elevation: 1.5,
           minimumSize: const Size.fromHeight(48),
         );
       case AppButtonVariant.secondary:
         return ElevatedButton.styleFrom(
           backgroundColor: scheme.secondaryContainer,
           foregroundColor: scheme.onSecondaryContainer,
+          shadowColor: scheme.secondary.withValues(alpha: 0.2),
+          elevation: 1,
           minimumSize: const Size.fromHeight(48),
         );
       case AppButtonVariant.danger:
         return ElevatedButton.styleFrom(
           backgroundColor: scheme.error,
           foregroundColor: scheme.onError,
+          shadowColor: scheme.error.withValues(alpha: 0.25),
+          elevation: 1,
           minimumSize: const Size.fromHeight(48),
         );
       case AppButtonVariant.ghost:
         return ElevatedButton.styleFrom(
           elevation: 0,
-          backgroundColor: Colors.transparent,
+          backgroundColor: scheme.primary.withValues(alpha: 0.08),
           foregroundColor: scheme.primary,
           minimumSize: const Size.fromHeight(48),
         );
+    }
+  }
+
+  Color _progressColor(ColorScheme scheme) {
+    switch (variant) {
+      case AppButtonVariant.primary:
+        return scheme.onPrimary;
+      case AppButtonVariant.secondary:
+        return scheme.onSecondaryContainer;
+      case AppButtonVariant.danger:
+        return scheme.onError;
+      case AppButtonVariant.ghost:
+        return scheme.primary;
     }
   }
 }
