@@ -156,6 +156,7 @@ class ApiSubject {
   const ApiSubject({
     required this.id,
     required this.name,
+    required this.description,
     required this.durationMinutes,
     required this.attemptLimit,
     required this.allowReview,
@@ -163,6 +164,7 @@ class ApiSubject {
 
   final String id;
   final String name;
+  final String description;
   final int durationMinutes;
   final int attemptLimit;
   final bool allowReview;
@@ -171,6 +173,7 @@ class ApiSubject {
     return ApiSubject(
       id: json['id'] as String,
       name: json['name'] as String,
+      description: json['description'] as String? ?? '',
       durationMinutes: json['durationMinutes'] as int,
       attemptLimit: json['attemptLimit'] as int,
       allowReview: json['allowReview'] as bool? ?? false,
@@ -181,6 +184,7 @@ class ApiSubject {
     return <String, dynamic>{
       'id': id,
       'name': name,
+      'description': description,
       'durationMinutes': durationMinutes,
       'attemptLimit': attemptLimit,
       'allowReview': allowReview,

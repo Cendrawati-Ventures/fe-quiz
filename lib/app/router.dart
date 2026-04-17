@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/state/auth_provider.dart';
 import '../features/exam/presentation/admin_dashboard_screen.dart';
+import '../features/exam/presentation/admin_subject_edit_screen.dart';
 import '../features/exam/presentation/admin_question_management_screen.dart';
 import '../features/exam/presentation/admin_result_monitoring_screen.dart';
 import '../features/exam/presentation/admin_subject_management_screen.dart';
@@ -59,6 +60,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/admin/subjects',
         name: 'admin-subjects',
         builder: (context, state) => const AdminSubjectManagementScreen(),
+      ),
+      GoRoute(
+        path: '/admin/subjects/:id/edit',
+        name: 'admin-subject-edit',
+        builder: (context, state) {
+          final subjectId = state.pathParameters['id']!;
+          return AdminSubjectEditScreen(subjectId: subjectId);
+        },
       ),
       GoRoute(
         path: '/admin/questions',

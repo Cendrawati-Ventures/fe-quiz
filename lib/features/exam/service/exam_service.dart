@@ -20,7 +20,7 @@ class ExamService {
             .map(ApiExam.fromJson)
             .toList();
       }
-      throw ApiError(message: 'Exam list response is invalid');
+      throw ApiError(message: 'Daftar ujian belum bisa dimuat.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -28,7 +28,7 @@ class ExamService {
 
   Future<List<ApiSubject>> listSubjects() async {
     try {
-      final response = await _dio.get<dynamic>('/subjects');
+      final response = await _dio.get<dynamic>('/api/subjects');
       final data = response.data;
       if (data is List<dynamic>) {
         return data
@@ -36,7 +36,72 @@ class ExamService {
             .map(ApiSubject.fromJson)
             .toList();
       }
-      throw ApiError(message: 'Subject list response is invalid');
+      throw ApiError(message: 'Daftar subject belum bisa dimuat.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<ApiSubject> createSubject({
+    required String name,
+    required String description,
+    required int durationMinutes,
+    required int attemptLimit,
+    required bool allowReview,
+  }) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/api/subjects',
+        data: <String, dynamic>{
+          'name': name,
+          'description': description,
+          'durationMinutes': durationMinutes,
+          'attemptLimit': attemptLimit,
+          'allowReview': allowReview,
+        },
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return ApiSubject.fromJson(data);
+      }
+      throw ApiError(message: 'Subject belum berhasil disimpan.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<ApiSubject> updateSubject({
+    required String id,
+    required String name,
+    required String description,
+    required int durationMinutes,
+    required int attemptLimit,
+    required bool allowReview,
+  }) async {
+    try {
+      final response = await _dio.put<dynamic>(
+        '/api/subjects/$id',
+        data: <String, dynamic>{
+          'name': name,
+          'description': description,
+          'durationMinutes': durationMinutes,
+          'attemptLimit': attemptLimit,
+          'allowReview': allowReview,
+        },
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return ApiSubject.fromJson(data);
+      }
+      throw ApiError(message: 'Perubahan subject belum berhasil disimpan.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<void> deleteSubject(String id) async {
+    try {
+      await _dio.delete<dynamic>('/api/subjects/$id');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -55,7 +120,7 @@ class ExamService {
       if (data is Map<String, dynamic>) {
         return StartAttemptResponse.fromJson(data);
       }
-      throw ApiError(message: 'Start attempt response is invalid');
+      throw ApiError(message: 'Ujian belum bisa dimulai.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -68,7 +133,7 @@ class ExamService {
       if (data is Map<String, dynamic>) {
         return AttemptDetail.fromJson(data);
       }
-      throw ApiError(message: 'Attempt detail response is invalid');
+      throw ApiError(message: 'Detail ujian belum bisa dimuat.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -92,7 +157,7 @@ class ExamService {
       if (data is Map<String, dynamic>) {
         return SaveAnswerResponse.fromJson(data);
       }
-      throw ApiError(message: 'Save answer response is invalid');
+      throw ApiError(message: 'Jawaban belum berhasil disimpan.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -116,7 +181,7 @@ class ExamService {
       if (data is Map<String, dynamic>) {
         return ProctoringResponse.fromJson(data);
       }
-      throw ApiError(message: 'Proctoring response is invalid');
+      throw ApiError(message: 'Data aktivitas belum berhasil dikirim.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -129,7 +194,7 @@ class ExamService {
       if (data is Map<String, dynamic>) {
         return SubmitResponse.fromJson(data);
       }
-      throw ApiError(message: 'Submit response is invalid');
+      throw ApiError(message: 'Pengumpulan ujian belum berhasil.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -145,7 +210,7 @@ class ExamService {
             .map(ResultResponse.fromJson)
             .toList();
       }
-      throw ApiError(message: 'Results response is invalid');
+      throw ApiError(message: 'Hasil ujian belum bisa dimuat.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -161,7 +226,7 @@ class ExamService {
             .map(ResultResponse.fromJson)
             .toList();
       }
-      throw ApiError(message: 'Admin results response is invalid');
+      throw ApiError(message: 'Data hasil belum bisa dimuat.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }

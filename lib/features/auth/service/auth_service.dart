@@ -29,7 +29,7 @@ class AuthService {
         }
       }
 
-      throw ApiError(message: 'Login response is invalid');
+      throw ApiError(message: 'Login belum berhasil. Coba lagi.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -42,7 +42,7 @@ class AuthService {
       if (data is Map<String, dynamic>) {
         return AuthUser.fromJson(data);
       }
-      throw ApiError(message: 'User profile response is invalid');
+      throw ApiError(message: 'Profil akun belum bisa dimuat.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
