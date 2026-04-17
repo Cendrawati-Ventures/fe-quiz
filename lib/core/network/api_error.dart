@@ -27,13 +27,13 @@ class ApiError implements Exception {
       case DioExceptionType.receiveTimeout:
         return ApiError(
           message:
-              'Connection timeout. Android emulator uses 10.0.2.2:3000, while physical Android must use PC LAN IP via --dart-define=API_BASE_URL=http://<PC_IP>:3000.',
+              'Connection timeout. Android emulator uses 10.0.2.2:8091, while physical Android must use PC LAN IP via --dart-define=API_BASE_URL=http://<PC_IP>:8091.',
           statusCode: statusCode,
         );
       case DioExceptionType.connectionError:
         return ApiError(
           message:
-              'Unable to connect to server. Emulator: use 10.0.2.2:3000. Physical Android: use PC LAN IP via --dart-define=API_BASE_URL=http://<PC_IP>:3000.',
+              'Unable to connect to server. Emulator: use 10.0.2.2:8091. Physical Android: use PC LAN IP via --dart-define=API_BASE_URL=http://<PC_IP>:8091.',
           statusCode: statusCode,
         );
       case DioExceptionType.badCertificate:
