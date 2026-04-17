@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/auth/state/auth_provider.dart';
 import 'router.dart';
 import 'theme/colors.dart';
 import 'theme/typography.dart';
@@ -20,6 +21,8 @@ class _AppView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+    final isAdmin = ref.watch(authProvider.select((value) => value.isAdmin));
+    final seed = isAdmin ? AppColors.adminPrimary : AppColors.studentPrimary;
 
     return MaterialApp.router(
       title: 'Online Exam System',
@@ -27,7 +30,7 @@ class _AppView extends ConsumerWidget {
       theme: ThemeData(
         scaffoldBackgroundColor: AppColors.bgBase,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.studentPrimary,
+          seedColor: seed,
           surface: AppColors.bgSurface,
         ),
         textTheme: AppTypography.textTheme,

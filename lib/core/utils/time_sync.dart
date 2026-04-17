@@ -15,4 +15,6 @@ class TimeSync {
   DateTime nowServerUtc() {
     return DateTime.now().toUtc().add(_serverOffset);
   }
+
+  int get serverOffsetMs => _serverOffset.inMilliseconds;
 }

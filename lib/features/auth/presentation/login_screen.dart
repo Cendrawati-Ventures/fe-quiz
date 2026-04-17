@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/spacing.dart';
 import '../../../shared/components/app_button.dart';
+import '../../../shared/components/app_card.dart';
 import '../state/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -14,13 +15,13 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final TextEditingController _identifierController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
   void dispose() {
-    _identifierController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -28,10 +29,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _onLoginPressed() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    await ref
-        .read(authProvider.notifier)
-        .login(
-          identifier: _identifierController.text.trim(),
+    await ref.read(authProvider.notifier).login(
+          username: _usernameController.text.trim(),
           password: _passwordController.text,
         );
 
@@ -39,7 +38,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final authState = ref.read(authProvider);
     if (authState.status == AuthStatus.authenticated) {
-      context.go('/exam');
+      context.go(authState.isAdmin ? '/admin/dashboard' : '/exam');
       return;
     }
 
@@ -53,52 +52,87 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
+      appBar: AppBar(title: const Text('Online Exam Login')),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                TextFormField(
-                  controller: _identifierController,
-                  decoration: const InputDecoration(
-                    labelText: 'Identifier',
-                    hintText: 'Masukkan email / username',
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth =
+                constraints.maxWidth > 560 ? 560.0 : constraints.maxWidth;
+
+            return Align(
+              alignment: Alignment.topCenter,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: cardWidth),
+                  child: AppCard(
+                    title: 'Masuk ke Sistem Ujian',
+                    subtitle:
+                        'Gunakan akun siswa/admin yang sudah terdaftar di backend.',
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          TextFormField(
+                            controller: _usernameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Username',
+                              hintText: 'Masukkan username',
+                            ),
+                            textInputAction: TextInputAction.next,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Username wajib diisi';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          TextFormField(
+                            controller: _passwordController,
+                            decoration: const InputDecoration(
+                              labelText: 'Password',
+                              hintText: 'Masukkan password',
+                            ),
+                            obscureText: true,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _onLoginPressed(),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Password wajib diisi';
+                              }
+                              return null;
+                            },
+                          ),
+                          if (authState.errorMessage != null &&
+                              authState.errorMessage!.isNotEmpty) ...<Widget>[
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              authState.errorMessage!,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(color: colorScheme.error),
+                            ),
+                          ],
+                          const SizedBox(height: AppSpacing.lg),
+                          AppButton(
+                            label: 'Login',
+                            loading: authState.isLoading,
+                            onPressed: _onLoginPressed,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  textInputAction: TextInputAction.next,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Identifier wajib diisi';
-                    }
-                    return null;
-                  },
                 ),
-                const SizedBox(height: AppSpacing.md),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Password wajib diisi';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                AppButton(
-                  label: 'Login',
-                  loading: authState.isLoading,
-                  onPressed: _onLoginPressed,
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );

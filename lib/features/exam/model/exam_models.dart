@@ -1,0 +1,559 @@
+import '../../auth/model/auth_user.dart';
+
+enum QuestionType { single, multi, group }
+
+QuestionType questionTypeFromString(String value) {
+  switch (value) {
+    case 'single':
+      return QuestionType.single;
+    case 'multi':
+      return QuestionType.multi;
+    case 'group':
+      return QuestionType.group;
+    default:
+      return QuestionType.single;
+  }
+}
+
+String questionTypeToString(QuestionType value) {
+  switch (value) {
+    case QuestionType.single:
+      return 'single';
+    case QuestionType.multi:
+      return 'multi';
+    case QuestionType.group:
+      return 'group';
+  }
+}
+
+enum AttemptStatus { inProgress, submitted, expired }
+
+AttemptStatus attemptStatusFromString(String value) {
+  switch (value) {
+    case 'in_progress':
+      return AttemptStatus.inProgress;
+    case 'submitted':
+      return AttemptStatus.submitted;
+    case 'expired':
+      return AttemptStatus.expired;
+    default:
+      return AttemptStatus.inProgress;
+  }
+}
+
+String attemptStatusToString(AttemptStatus value) {
+  switch (value) {
+    case AttemptStatus.inProgress:
+      return 'in_progress';
+    case AttemptStatus.submitted:
+      return 'submitted';
+    case AttemptStatus.expired:
+      return 'expired';
+  }
+}
+
+enum RiskLevel { safe, suspicious, highRisk }
+
+RiskLevel riskLevelFromString(String value) {
+  switch (value) {
+    case 'safe':
+      return RiskLevel.safe;
+    case 'suspicious':
+      return RiskLevel.suspicious;
+    case 'high_risk':
+      return RiskLevel.highRisk;
+    default:
+      return RiskLevel.safe;
+  }
+}
+
+String riskLevelToString(RiskLevel value) {
+  switch (value) {
+    case RiskLevel.safe:
+      return 'safe';
+    case RiskLevel.suspicious:
+      return 'suspicious';
+    case RiskLevel.highRisk:
+      return 'high_risk';
+  }
+}
+
+enum ProctoringEventType { tabSwitch, appBackground, idle, noise }
+
+ProctoringEventType proctoringEventTypeFromString(String value) {
+  switch (value) {
+    case 'tab_switch':
+      return ProctoringEventType.tabSwitch;
+    case 'app_background':
+      return ProctoringEventType.appBackground;
+    case 'idle':
+      return ProctoringEventType.idle;
+    case 'noise':
+      return ProctoringEventType.noise;
+    default:
+      return ProctoringEventType.noise;
+  }
+}
+
+String proctoringEventTypeToString(ProctoringEventType value) {
+  switch (value) {
+    case ProctoringEventType.tabSwitch:
+      return 'tab_switch';
+    case ProctoringEventType.appBackground:
+      return 'app_background';
+    case ProctoringEventType.idle:
+      return 'idle';
+    case ProctoringEventType.noise:
+      return 'noise';
+  }
+}
+
+class ApiExam {
+  const ApiExam({
+    required this.id,
+    required this.title,
+    required this.isPublished,
+    required this.startTime,
+    required this.endTime,
+    this.videoProvider,
+    this.videoRoomId,
+  });
+
+  final String id;
+  final String title;
+  final bool isPublished;
+  final DateTime startTime;
+  final DateTime endTime;
+  final String? videoProvider;
+  final String? videoRoomId;
+
+  factory ApiExam.fromJson(Map<String, dynamic> json) {
+    return ApiExam(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      isPublished: json['isPublished'] as bool? ?? false,
+      startTime: DateTime.parse(json['startTime'] as String),
+      endTime: DateTime.parse(json['endTime'] as String),
+      videoProvider: json['videoProvider'] as String?,
+      videoRoomId: json['videoRoomId'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'title': title,
+      'isPublished': isPublished,
+      'startTime': startTime.toIso8601String(),
+      'endTime': endTime.toIso8601String(),
+      'videoProvider': videoProvider,
+      'videoRoomId': videoRoomId,
+    };
+  }
+}
+
+class ApiSubject {
+  const ApiSubject({
+    required this.id,
+    required this.name,
+    required this.durationMinutes,
+    required this.attemptLimit,
+    required this.allowReview,
+  });
+
+  final String id;
+  final String name;
+  final int durationMinutes;
+  final int attemptLimit;
+  final bool allowReview;
+
+  factory ApiSubject.fromJson(Map<String, dynamic> json) {
+    return ApiSubject(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      durationMinutes: json['durationMinutes'] as int,
+      attemptLimit: json['attemptLimit'] as int,
+      allowReview: json['allowReview'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'name': name,
+      'durationMinutes': durationMinutes,
+      'attemptLimit': attemptLimit,
+      'allowReview': allowReview,
+    };
+  }
+}
+
+class ApiQuestion {
+  const ApiQuestion({
+    required this.id,
+    required this.subjectId,
+    required this.type,
+    required this.text,
+    required this.options,
+    required this.weight,
+  });
+
+  final String id;
+  final String subjectId;
+  final QuestionType type;
+  final String text;
+  final Object? options;
+  final num weight;
+
+  factory ApiQuestion.fromJson(Map<String, dynamic> json) {
+    return ApiQuestion(
+      id: json['id'] as String,
+      subjectId: json['subjectId'] as String,
+      type: questionTypeFromString(json['type'] as String),
+      text: json['text'] as String,
+      options: json['options'],
+      weight: (json['weight'] as num?) ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'subjectId': subjectId,
+      'type': questionTypeToString(type),
+      'text': text,
+      'options': options,
+      'weight': weight,
+    };
+  }
+}
+
+class ApiAttempt {
+  const ApiAttempt({
+    required this.id,
+    required this.userId,
+    required this.examId,
+    required this.subjectId,
+    required this.attemptNo,
+    required this.startTime,
+    required this.status,
+    this.endTime,
+  });
+
+  final String id;
+  final String userId;
+  final String examId;
+  final String subjectId;
+  final int attemptNo;
+  final DateTime startTime;
+  final DateTime? endTime;
+  final AttemptStatus status;
+
+  factory ApiAttempt.fromJson(Map<String, dynamic> json) {
+    return ApiAttempt(
+      id: json['id'] as String,
+      userId: json['userId'] as String,
+      examId: json['examId'] as String,
+      subjectId: json['subjectId'] as String,
+      attemptNo: json['attemptNo'] as int,
+      startTime: DateTime.parse(json['startTime'] as String),
+      endTime: (json['endTime'] as String?) == null
+          ? null
+          : DateTime.parse(json['endTime'] as String),
+      status: attemptStatusFromString(json['status'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'userId': userId,
+      'examId': examId,
+      'subjectId': subjectId,
+      'attemptNo': attemptNo,
+      'startTime': startTime.toIso8601String(),
+      'endTime': endTime?.toIso8601String(),
+      'status': attemptStatusToString(status),
+    };
+  }
+
+  ApiAttempt copyWith({
+    String? id,
+    String? userId,
+    String? examId,
+    String? subjectId,
+    int? attemptNo,
+    DateTime? startTime,
+    DateTime? endTime,
+    AttemptStatus? status,
+  }) {
+    return ApiAttempt(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      examId: examId ?? this.examId,
+      subjectId: subjectId ?? this.subjectId,
+      attemptNo: attemptNo ?? this.attemptNo,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      status: status ?? this.status,
+    );
+  }
+}
+
+class StartAttemptResponse {
+  const StartAttemptResponse({
+    required this.attempt,
+    required this.questions,
+  });
+
+  final ApiAttempt attempt;
+  final List<ApiQuestion> questions;
+
+  factory StartAttemptResponse.fromJson(Map<String, dynamic> json) {
+    final rawQuestions = (json['questions'] as List<dynamic>? ?? <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    return StartAttemptResponse(
+      attempt: ApiAttempt.fromJson(json['attempt'] as Map<String, dynamic>),
+      questions: rawQuestions.map(ApiQuestion.fromJson).toList(),
+    );
+  }
+}
+
+class SaveAnswerResponse {
+  const SaveAnswerResponse({
+    required this.id,
+    required this.attemptId,
+    required this.questionId,
+    required this.answer,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String attemptId;
+  final String questionId;
+  final Object? answer;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  factory SaveAnswerResponse.fromJson(Map<String, dynamic> json) {
+    return SaveAnswerResponse(
+      id: json['id'] as String,
+      attemptId: json['attemptId'] as String,
+      questionId: json['questionId'] as String,
+      answer: json['answer'],
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+    );
+  }
+}
+
+class ProctoringEventPayload {
+  const ProctoringEventPayload({
+    required this.attemptId,
+    required this.type,
+    required this.value,
+    required this.timestamp,
+  });
+
+  final String attemptId;
+  final ProctoringEventType type;
+  final int value;
+  final DateTime timestamp;
+
+  factory ProctoringEventPayload.fromJson(Map<String, dynamic> json) {
+    return ProctoringEventPayload(
+      attemptId: json['attemptId'] as String,
+      type: proctoringEventTypeFromString(json['type'] as String),
+      value: json['value'] as int,
+      timestamp: DateTime.parse(json['timestamp'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'attemptId': attemptId,
+      'type': proctoringEventTypeToString(type),
+      'value': value,
+      'timestamp': timestamp.toIso8601String(),
+    };
+  }
+}
+
+class ProctoringResponse {
+  const ProctoringResponse({
+    required this.accepted,
+    required this.ignored,
+  });
+
+  final int accepted;
+  final int ignored;
+
+  factory ProctoringResponse.fromJson(Map<String, dynamic> json) {
+    return ProctoringResponse(
+      accepted: json['accepted'] as int? ?? 0,
+      ignored: json['ignored'] as int? ?? 0,
+    );
+  }
+}
+
+class SubmitResponse {
+  const SubmitResponse({
+    required this.id,
+    required this.attemptId,
+    required this.score,
+    required this.correct,
+    required this.wrong,
+    required this.duration,
+    required this.cheatScore,
+    required this.riskLevel,
+  });
+
+  final String id;
+  final String attemptId;
+  final num score;
+  final int correct;
+  final int wrong;
+  final int duration;
+  final int cheatScore;
+  final RiskLevel riskLevel;
+
+  factory SubmitResponse.fromJson(Map<String, dynamic> json) {
+    return SubmitResponse(
+      id: json['id'] as String,
+      attemptId: json['attemptId'] as String,
+      score: json['score'] as num? ?? 0,
+      correct: json['correct'] as int? ?? 0,
+      wrong: json['wrong'] as int? ?? 0,
+      duration: json['duration'] as int? ?? 0,
+      cheatScore: json['cheatScore'] as int? ?? 0,
+      riskLevel: riskLevelFromString(json['riskLevel'] as String? ?? 'safe'),
+    );
+  }
+
+  ResultResponse toResultResponse() {
+    return ResultResponse(
+      id: id,
+      attemptId: attemptId,
+      score: score,
+      correct: correct,
+      wrong: wrong,
+      duration: duration,
+      cheatScore: cheatScore,
+      riskLevel: riskLevel,
+      examTitle: null,
+      subjectName: null,
+      username: null,
+    );
+  }
+}
+
+class ResultResponse {
+  const ResultResponse({
+    required this.id,
+    required this.attemptId,
+    required this.score,
+    required this.correct,
+    required this.wrong,
+    required this.duration,
+    required this.cheatScore,
+    required this.riskLevel,
+    required this.examTitle,
+    required this.subjectName,
+    required this.username,
+  });
+
+  final String id;
+  final String attemptId;
+  final num score;
+  final int correct;
+  final int wrong;
+  final int duration;
+  final int cheatScore;
+  final RiskLevel riskLevel;
+  final String? examTitle;
+  final String? subjectName;
+  final String? username;
+
+  factory ResultResponse.fromJson(Map<String, dynamic> json) {
+    return ResultResponse(
+      id: json['id'] as String,
+      attemptId: json['attemptId'] as String,
+      score: json['score'] as num? ?? 0,
+      correct: json['correct'] as int? ?? 0,
+      wrong: json['wrong'] as int? ?? 0,
+      duration: json['duration'] as int? ?? 0,
+      cheatScore: json['cheatScore'] as int? ?? 0,
+      riskLevel: riskLevelFromString(json['riskLevel'] as String? ?? 'safe'),
+      examTitle: json['examTitle'] as String?,
+      subjectName: json['subjectName'] as String?,
+      username: json['username'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'attemptId': attemptId,
+      'score': score,
+      'correct': correct,
+      'wrong': wrong,
+      'duration': duration,
+      'cheatScore': cheatScore,
+      'riskLevel': riskLevelToString(riskLevel),
+      'examTitle': examTitle,
+      'subjectName': subjectName,
+      'username': username,
+    };
+  }
+}
+
+class AttemptAnswer {
+  const AttemptAnswer({
+    required this.questionId,
+    required this.answer,
+  });
+
+  final String questionId;
+  final Object? answer;
+}
+
+class AttemptDetail {
+  const AttemptDetail({
+    required this.attempt,
+    required this.answers,
+  });
+
+  final ApiAttempt attempt;
+  final List<AttemptAnswer> answers;
+
+  factory AttemptDetail.fromJson(Map<String, dynamic> json) {
+    final answers = <AttemptAnswer>[];
+    final rawAnswers = json['answers'];
+    if (rawAnswers is List<dynamic>) {
+      for (final raw in rawAnswers) {
+        if (raw is Map<String, dynamic>) {
+          final questionId = raw['questionId'] as String?;
+          if (questionId != null && questionId.isNotEmpty) {
+            answers.add(
+                AttemptAnswer(questionId: questionId, answer: raw['answer']));
+          }
+        }
+      }
+    }
+
+    final attempt = ApiAttempt.fromJson(json);
+    return AttemptDetail(attempt: attempt, answers: answers);
+  }
+}
+
+class AuthScopedResults {
+  const AuthScopedResults({
+    required this.results,
+    required this.role,
+  });
+
+  final List<ResultResponse> results;
+  final UserRole role;
+}
