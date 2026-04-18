@@ -39,7 +39,7 @@ class _AppView extends ConsumerWidget {
     );
 
     return MaterialApp.router(
-      title: 'Online Exam System',
+      title: 'Quiz Bali Q_Ta',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

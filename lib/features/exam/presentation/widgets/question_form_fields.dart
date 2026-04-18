@@ -63,28 +63,32 @@ class QuestionFormFields extends StatelessWidget {
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: AppSpacing.sm),
-        for (var index = 0; index < 4; index++) ...<Widget>[
-          Row(
+        RadioGroup<int>(
+          groupValue: correctAnswerIndex,
+          onChanged: onCorrectAnswerChanged,
+          child: Column(
             children: <Widget>[
-              Radio<int>(
-                value: index,
-                groupValue: correctAnswerIndex,
-                onChanged: onCorrectAnswerChanged,
-              ),
-              Expanded(
-                child: TextFormField(
-                  controller: optionControllers[index],
-                  decoration: InputDecoration(
-                    labelText: 'Opsi ${labels[index]}',
-                    hintText: 'Isi teks opsi ${labels[index]}',
-                  ),
-                  validator: validateOptionText,
+              for (var index = 0; index < 4; index++) ...<Widget>[
+                Row(
+                  children: <Widget>[
+                    Radio<int>(value: index),
+                    Expanded(
+                      child: TextFormField(
+                        controller: optionControllers[index],
+                        decoration: InputDecoration(
+                          labelText: 'Opsi ${labels[index]}',
+                          hintText: 'Isi teks opsi ${labels[index]}',
+                        ),
+                        validator: validateOptionText,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+                if (index < 3) const SizedBox(height: AppSpacing.xs),
+              ],
             ],
           ),
-          if (index < 3) const SizedBox(height: AppSpacing.xs),
-        ],
+        ),
       ],
     );
   }
@@ -119,9 +123,6 @@ class QuestionFormFields extends StatelessWidget {
     final text = value?.trim() ?? '';
     if (text.isEmpty) {
       return 'Opsi wajib diisi.';
-    }
-    if (text.length < 1) {
-      return 'Opsi tidak valid.';
     }
     return null;
   }
