@@ -6,6 +6,7 @@ import '../features/auth/state/auth_provider.dart';
 import '../features/exam/presentation/admin_dashboard_screen.dart';
 import '../features/exam/presentation/admin_question_management_screen.dart';
 import '../features/exam/presentation/admin_result_monitoring_screen.dart';
+import '../features/exam/presentation/admin_student_account_management_screen.dart';
 import '../features/exam/presentation/admin_subject_management_screen.dart';
 import '../features/exam/presentation/exam_detail_start_screen.dart';
 import '../features/exam/presentation/exam_list_screen.dart';
@@ -64,6 +65,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/admin/questions',
         name: 'admin-questions',
         builder: (context, state) => const AdminQuestionManagementScreen(),
+      ),
+      GoRoute(
+        path: '/admin/students',
+        name: 'admin-students',
+        builder: (context, state) =>
+            const AdminStudentAccountManagementScreen(),
       ),
       GoRoute(
         path: '/admin/results',

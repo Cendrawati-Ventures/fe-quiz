@@ -23,6 +23,9 @@ class ExamScreen extends ConsumerStatefulWidget {
 }
 
 class _ExamScreenState extends ConsumerState<ExamScreen> {
+  bool _isSubmitFailureDialogVisible = false;
+  BuildContext? _submitFailureDialogContext;
+
   @override
   void initState() {
     super.initState();
@@ -31,6 +34,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
   @override
   void dispose() {
+    _dismissSubmitFailureDialog();
     _disableSecureFlag();
     super.dispose();
   }
@@ -41,17 +45,19 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
       if (previous?.submitState != SubmitState.success &&
           next.submitState == SubmitState.success &&
           mounted) {
+        _dismissSubmitFailureDialog();
         context.go('/result');
         return;
       }
 
-      if (next.submitState == SubmitState.failed &&
+      final failedNow = previous?.submitState != SubmitState.failed &&
+          next.submitState == SubmitState.failed;
+      if (failedNow &&
+          next.hasActiveAttempt &&
           next.errorMessage != null &&
           next.errorMessage!.isNotEmpty &&
           mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.errorMessage!)),
-        );
+        _showSubmitFailureDialog(next.errorMessage!);
       }
     });
 
@@ -82,9 +88,17 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     }
 
     final answer = state.answersByQuestionId[question.id];
+    final isGroupQuestion = question.type == QuestionType.group;
+    final groupSubQuestions = isGroupQuestion
+        ? extractGroupSubQuestions(question.options)
+        : const <GroupSubQuestion>[];
+    final groupParentText =
+        isGroupQuestion ? extractGroupParentText(question.options) : null;
+    final groupAnswerMap =
+        isGroupQuestion ? normalizeGroupAnswerMap(answer) : <String, dynamic>{};
     final options = _normalizeOptions(question.options);
     final isMulti = question.type == QuestionType.multi ||
-        question.type == QuestionType.group;
+        (isGroupQuestion && groupSubQuestions.isEmpty);
     final progress =
         totalQuestions == 0 ? 0.0 : (currentIndex + 1) / totalQuestions;
 
@@ -166,33 +180,40 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: options.length,
-                    itemBuilder: (context, index) {
-                      final option = options[index];
-                      final selected = _isOptionSelected(
-                        answer: answer,
-                        optionValue: option.value,
-                        isMulti: isMulti,
-                      );
-                      return OptionItem(
-                        option: option.label,
-                        selected: selected,
-                        multiSelect: isMulti,
-                        onTap: () {
-                          final nextAnswer = _nextAnswerValue(
-                            previousAnswer: answer,
-                            optionValue: option.value,
-                            isMulti: isMulti,
-                          );
-                          notifier.answerQuestion(
-                            questionId: question.id,
-                            answer: nextAnswer,
-                          );
-                        },
-                      );
-                    },
-                  ),
+                  child: isGroupQuestion && groupSubQuestions.isNotEmpty
+                      ? _buildGroupQuestionBody(
+                          questionId: question.id,
+                          parentText: groupParentText,
+                          subQuestions: groupSubQuestions,
+                          groupAnswer: groupAnswerMap,
+                        )
+                      : ListView.builder(
+                          itemCount: options.length,
+                          itemBuilder: (context, index) {
+                            final option = options[index];
+                            final selected = _isOptionSelected(
+                              answer: answer,
+                              optionValue: option.value,
+                              isMulti: isMulti,
+                            );
+                            return OptionItem(
+                              option: option.label,
+                              selected: selected,
+                              multiSelect: isMulti,
+                              onTap: () {
+                                final nextAnswer = _nextAnswerValue(
+                                  previousAnswer: answer,
+                                  optionValue: option.value,
+                                  isMulti: isMulti,
+                                );
+                                notifier.answerQuestion(
+                                  questionId: question.id,
+                                  answer: nextAnswer,
+                                );
+                              },
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
@@ -232,6 +253,163 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildGroupQuestionBody({
+    required String questionId,
+    required String? parentText,
+    required List<GroupSubQuestion> subQuestions,
+    required Map<String, dynamic> groupAnswer,
+  }) {
+    final notifier = ref.read(examSessionProvider.notifier);
+
+    return ListView.builder(
+      itemCount: subQuestions.length + (parentText == null ? 0 : 1),
+      itemBuilder: (context, index) {
+        if (parentText != null && index == 0) {
+          return Card(
+            elevation: 0,
+            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Text(parentText),
+            ),
+          );
+        }
+
+        final safeIndex = parentText == null ? index : index - 1;
+        final subQuestion = subQuestions[safeIndex];
+        final subOptions = _normalizeOptions(subQuestion.options);
+        final isMulti = subQuestion.type == QuestionType.multi;
+        final subAnswer = groupAnswer[subQuestion.id];
+
+        return Card(
+          elevation: 0,
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '${safeIndex + 1}. ${subQuestion.text}',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                if (subOptions.isEmpty)
+                  const Text('Opsi tidak tersedia untuk sub-soal ini.'),
+                ...subOptions.map((option) {
+                  final selected = _isOptionSelected(
+                    answer: subAnswer,
+                    optionValue: option.value,
+                    isMulti: isMulti,
+                  );
+                  return OptionItem(
+                    option: option.label,
+                    selected: selected,
+                    multiSelect: isMulti,
+                    onTap: () {
+                      final latestSession = ref.read(examSessionProvider);
+                      final latestGroupAnswer = normalizeGroupAnswerMap(
+                        latestSession.answersByQuestionId[questionId],
+                      );
+                      final latestSubAnswer = latestGroupAnswer[subQuestion.id];
+                      final nextSubAnswer = _nextAnswerValue(
+                        previousAnswer: latestSubAnswer,
+                        optionValue: option.value,
+                        isMulti: isMulti,
+                      );
+                      final nextGroupAnswer =
+                          Map<String, dynamic>.from(latestGroupAnswer);
+                      if (_isAnswerEmpty(nextSubAnswer)) {
+                        nextGroupAnswer.remove(subQuestion.id);
+                      } else {
+                        nextGroupAnswer[subQuestion.id] = nextSubAnswer;
+                      }
+                      notifier.answerQuestion(
+                        questionId: questionId,
+                        answer: nextGroupAnswer,
+                      );
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showSubmitFailureDialog(String message) async {
+    if (_isSubmitFailureDialogVisible || !mounted) {
+      return;
+    }
+    _isSubmitFailureDialogVisible = true;
+    _submitFailureDialogContext = null;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        _submitFailureDialogContext = dialogContext;
+        return PopScope(
+          canPop: false,
+          child: Consumer(
+            builder: (context, ref, _) {
+              final session = ref.watch(examSessionProvider);
+              final submitting = session.submitState == SubmitState.submitting;
+              final errorText = session.errorMessage ?? message;
+
+              return AlertDialog(
+                title: const Text('Submit Gagal'),
+                content: Text(errorText),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: submitting
+                        ? null
+                        : () async {
+                            await ref
+                                .read(examSessionProvider.notifier)
+                                .submitAttempt();
+                          },
+                    child: submitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Retry Submit'),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+
+    _isSubmitFailureDialogVisible = false;
+    _submitFailureDialogContext = null;
+  }
+
+  void _dismissSubmitFailureDialog() {
+    if (!_isSubmitFailureDialogVisible) {
+      return;
+    }
+    final dialogContext = _submitFailureDialogContext;
+    if (dialogContext == null || !dialogContext.mounted) {
+      return;
+    }
+    final navigator = Navigator.of(dialogContext, rootNavigator: true);
+    if (!navigator.canPop()) {
+      return;
+    }
+    navigator.pop();
+    _isSubmitFailureDialogVisible = false;
+    _submitFailureDialogContext = null;
   }
 
   Future<void> _enableSecureFlag() async {
@@ -303,6 +481,22 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
       values.add(optionValue);
     }
     return values;
+  }
+
+  bool _isAnswerEmpty(Object? value) {
+    if (value == null) {
+      return true;
+    }
+    if (value is String) {
+      return value.trim().isEmpty;
+    }
+    if (value is List<dynamic>) {
+      return value.isEmpty;
+    }
+    if (value is Map<String, dynamic>) {
+      return value.isEmpty;
+    }
+    return false;
   }
 
   List<_OptionView> _normalizeOptions(Object? options) {

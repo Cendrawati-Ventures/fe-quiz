@@ -12,6 +12,8 @@ final outboxQueueProvider = Provider<OutboxQueue>((ref) {
 
 enum OutboxItemType { answer, proctoring, submit }
 
+enum OutboxFailureAction { scheduled, dropped, missing }
+
 OutboxItemType outboxTypeFromString(String value) {
   switch (value) {
     case 'answer':
@@ -99,6 +101,7 @@ class OutboxQueue {
   OutboxQueue({required AppLocalDb localDb}) : _localDb = localDb;
 
   static const int _maxBackoffMs = 60000;
+  static const int maxRetryLimit = 6;
   final AppLocalDb _localDb;
   final Random _random = Random();
 
@@ -166,7 +169,7 @@ class OutboxQueue {
     await _localDb.deleteOutboxRowById(itemId);
   }
 
-  Future<void> markFailure(String itemId) async {
+  Future<OutboxFailureAction> markFailure(String itemId) async {
     OutboxItem? currentItem;
     final current = await getItems();
     for (final item in current) {
@@ -176,17 +179,23 @@ class OutboxQueue {
       }
     }
     if (currentItem == null) {
-      return;
+      return OutboxFailureAction.missing;
     }
 
     final nowMs = DateTime.now().toUtc().millisecondsSinceEpoch;
     final retryCount = currentItem.retryCount + 1;
+    if (retryCount > maxRetryLimit) {
+      await _localDb.deleteOutboxRowById(itemId);
+      return OutboxFailureAction.dropped;
+    }
+
     final backoffMs = _computeBackoffMs(retryCount);
     await _localDb.updateOutboxRetry(
       id: itemId,
       retryCount: retryCount,
       nextRetryAtEpochMs: nowMs + backoffMs,
     );
+    return OutboxFailureAction.scheduled;
   }
 
   Future<void> clearByAttempt(String attemptId) async {
