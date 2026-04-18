@@ -21,8 +21,8 @@ class ApiClient {
     }
   }
 
-  static const String _localhostBaseUrl = 'http://localhost:3000';
-  static const String _androidEmulatorBaseUrl = 'http://10.0.2.2:3000';
+  static const String _localhostBaseUrl = 'http://localhost:8091';
+  static const String _androidEmulatorBaseUrl = 'http://10.0.2.2:8091';
   static const String _skipAuthTokenKey = 'skipAuthToken';
 
   final Dio _dio;

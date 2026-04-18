@@ -577,7 +577,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Failed to start attempt',
+        errorMessage: 'Ujian belum bisa dimulai. Coba lagi.',
         submitState: SubmitState.failed,
       );
     }
@@ -626,7 +626,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       }
       state = state.copyWith(errorMessage: error.message);
     } catch (_) {
-      state = state.copyWith(errorMessage: 'Failed to recover active attempt');
+      state = state.copyWith(errorMessage: 'Sesi ujian belum bisa dipulihkan.');
     }
   }
 
@@ -722,7 +722,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       state = state.copyWith(
         submitState: SubmitState.failed,
         isLoading: false,
-        errorMessage: state.errorMessage ?? 'Submit failed. Please retry.',
+        errorMessage: state.errorMessage ?? 'Pengumpulan ujian belum berhasil.',
       );
       await _persistSession();
     }
@@ -776,7 +776,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
                 : state.submitState,
             errorMessage: dropped
                 ? _buildDroppedQueueMessage(item)
-                : 'Network sync failed, retrying in background.',
+                : 'Koneksi sedang bermasalah. Sistem akan coba lagi.',
           );
         }
       }

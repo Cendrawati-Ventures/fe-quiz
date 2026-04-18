@@ -134,7 +134,7 @@ class AuthNotifier extends Notifier<AuthState> {
       state = const AuthState(
         status: AuthStatus.unauthenticated,
         isLoading: false,
-        errorMessage: 'Login failed',
+        errorMessage: 'Login belum berhasil. Coba lagi.',
       );
     }
   }
