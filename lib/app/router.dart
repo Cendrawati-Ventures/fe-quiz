@@ -4,8 +4,11 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/state/auth_provider.dart';
 import '../features/exam/presentation/admin_dashboard_screen.dart';
+import '../features/exam/presentation/admin_question_edit_screen.dart';
+import '../features/exam/presentation/admin_subject_edit_screen.dart';
 import '../features/exam/presentation/admin_question_management_screen.dart';
 import '../features/exam/presentation/admin_result_monitoring_screen.dart';
+import '../features/exam/presentation/admin_student_account_management_screen.dart';
 import '../features/exam/presentation/admin_subject_management_screen.dart';
 import '../features/exam/presentation/exam_detail_start_screen.dart';
 import '../features/exam/presentation/exam_list_screen.dart';
@@ -61,9 +64,40 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AdminSubjectManagementScreen(),
       ),
       GoRoute(
+        path: '/admin/subjects/:id/edit',
+        name: 'admin-subject-edit',
+        builder: (context, state) {
+          final subjectId = state.pathParameters['id']!;
+          return AdminSubjectEditScreen(subjectId: subjectId);
+        },
+      ),
+      GoRoute(
         path: '/admin/questions',
         name: 'admin-questions',
-        builder: (context, state) => const AdminQuestionManagementScreen(),
+        builder: (context, state) {
+          final initialSubjectId = state.uri.queryParameters['subjectId'];
+          return AdminQuestionManagementScreen(
+            initialSubjectId: initialSubjectId,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/admin/questions/:subjectId/:questionId/edit',
+        name: 'admin-question-edit',
+        builder: (context, state) {
+          final subjectId = state.pathParameters['subjectId']!;
+          final questionId = state.pathParameters['questionId']!;
+          return AdminQuestionEditScreen(
+            subjectId: subjectId,
+            questionId: questionId,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/admin/students',
+        name: 'admin-students',
+        builder: (context, state) =>
+            const AdminStudentAccountManagementScreen(),
       ),
       GoRoute(
         path: '/admin/results',

@@ -53,6 +53,227 @@ enum ConnectionStatus { unknown, online, offline }
 
 enum SyncStatus { synced, pending, retrying }
 
+class GroupSubQuestion {
+  const GroupSubQuestion({
+    required this.id,
+    required this.text,
+    required this.type,
+    required this.options,
+  });
+
+  final String id;
+  final String text;
+  final QuestionType type;
+  final Object? options;
+}
+
+List<GroupSubQuestion> extractGroupSubQuestions(Object? options) {
+  final result = <GroupSubQuestion>[];
+
+  void addFromEntry({
+    required Object? raw,
+    required String fallbackId,
+  }) {
+    if (raw is! Map<String, dynamic>) {
+      return;
+    }
+    if (!_looksLikeSubQuestion(raw)) {
+      return;
+    }
+    final id = _extractSubQuestionId(raw, fallbackId);
+    final text = _extractSubQuestionText(raw, id);
+    final type = _extractSubQuestionType(raw);
+    final subOptions = raw['options'] ?? raw['choices'] ?? raw['answers'];
+    result.add(
+      GroupSubQuestion(
+        id: id,
+        text: text,
+        type: type,
+        options: subOptions,
+      ),
+    );
+  }
+
+  void addFromList(List<dynamic> list, String prefix) {
+    for (var i = 0; i < list.length; i++) {
+      addFromEntry(raw: list[i], fallbackId: '$prefix-$i');
+    }
+  }
+
+  void addFromMap(Map<String, dynamic> map, String prefix) {
+    final knownKeys = <String>[
+      'subQuestions',
+      'sub_questions',
+      'subquestions',
+      'questions',
+      'children',
+      'items',
+      'parts',
+    ];
+
+    for (final key in knownKeys) {
+      final candidate = map[key];
+      if (candidate is List<dynamic>) {
+        addFromList(candidate, key);
+        if (result.isNotEmpty) {
+          return;
+        }
+      }
+      if (candidate is Map<String, dynamic>) {
+        var index = 0;
+        for (final entry in candidate.entries) {
+          addFromEntry(
+            raw: <String, dynamic>{
+              ...?((entry.value is Map<String, dynamic>)
+                  ? entry.value as Map<String, dynamic>
+                  : null),
+              if (entry.value is! Map<String, dynamic>) 'text': entry.value,
+              'id': entry.key,
+            },
+            fallbackId: '$key-$index',
+          );
+          index++;
+        }
+        if (result.isNotEmpty) {
+          return;
+        }
+      }
+    }
+
+    var index = 0;
+    for (final entry in map.entries) {
+      if (entry.value is Map<String, dynamic>) {
+        addFromEntry(
+          raw: <String, dynamic>{
+            ...(entry.value as Map<String, dynamic>),
+            if (!(entry.value as Map<String, dynamic>).containsKey('id'))
+              'id': entry.key,
+          },
+          fallbackId: '$prefix-$index',
+        );
+      }
+      index++;
+    }
+  }
+
+  if (options is List<dynamic>) {
+    addFromList(options, 'list');
+  } else if (options is Map<String, dynamic>) {
+    addFromMap(options, 'map');
+  }
+
+  return result;
+}
+
+String? extractGroupParentText(Object? options) {
+  if (options is! Map<String, dynamic>) {
+    return null;
+  }
+  final parentKeys = <String>[
+    'parent',
+    'parentText',
+    'passage',
+    'context',
+    'stem',
+    'description',
+    'instruction',
+  ];
+  for (final key in parentKeys) {
+    final value = options[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+Map<String, dynamic> normalizeGroupAnswerMap(Object? rawAnswer) {
+  final normalized = <String, dynamic>{};
+
+  bool hasValue(Object? value) {
+    if (value == null) {
+      return false;
+    }
+    if (value is String) {
+      return value.trim().isNotEmpty;
+    }
+    if (value is List<dynamic>) {
+      return value.isNotEmpty;
+    }
+    if (value is Map<String, dynamic>) {
+      return value.isNotEmpty;
+    }
+    return true;
+  }
+
+  if (rawAnswer is Map<String, dynamic>) {
+    rawAnswer.forEach((key, value) {
+      if (hasValue(value)) {
+        normalized[key] = value;
+      }
+    });
+    return normalized;
+  }
+
+  if (rawAnswer is List<dynamic>) {
+    for (final entry in rawAnswer) {
+      if (entry is! Map<String, dynamic>) {
+        continue;
+      }
+      final id = (entry['id'] ??
+              entry['questionId'] ??
+              entry['subQuestionId'] ??
+              entry['key'])
+          ?.toString();
+      if (id == null || id.isEmpty) {
+        continue;
+      }
+      final value = entry['answer'] ?? entry['value'];
+      if (hasValue(value)) {
+        normalized[id] = value;
+      }
+    }
+  }
+
+  return normalized;
+}
+
+String _extractSubQuestionId(Map<String, dynamic> raw, String fallbackId) {
+  final candidate =
+      raw['id'] ?? raw['questionId'] ?? raw['subQuestionId'] ?? raw['key'];
+  final value = candidate?.toString() ?? fallbackId;
+  return value.trim().isEmpty ? fallbackId : value;
+}
+
+String _extractSubQuestionText(Map<String, dynamic> raw, String fallbackId) {
+  final text = raw['text'] ?? raw['question'] ?? raw['label'] ?? raw['title'];
+  final stringValue = text?.toString();
+  if (stringValue == null || stringValue.trim().isEmpty) {
+    return 'Sub-question $fallbackId';
+  }
+  return stringValue.trim();
+}
+
+QuestionType _extractSubQuestionType(Map<String, dynamic> raw) {
+  final typeRaw = raw['type']?.toString().toLowerCase();
+  if (typeRaw == 'multi') {
+    return QuestionType.multi;
+  }
+  return QuestionType.single;
+}
+
+bool _looksLikeSubQuestion(Map<String, dynamic> raw) {
+  if (raw.containsKey('options') || raw.containsKey('choices')) {
+    return true;
+  }
+
+  final hasQuestionText = (raw['text'] ?? raw['question'] ?? raw['label'])
+      ?.toString()
+      .trim()
+      .isNotEmpty;
+  return hasQuestionText == true;
+}
+
 class ExamSessionState {
   const ExamSessionState({
     this.isLoading = false,
@@ -105,6 +326,32 @@ class ExamSessionState {
   int get unansweredCount {
     return questions.where((question) {
       final answer = answersByQuestionId[question.id];
+      if (question.type == QuestionType.group) {
+        final groupSubQuestions = extractGroupSubQuestions(question.options);
+        final groupAnswer = normalizeGroupAnswerMap(answer);
+
+        if (groupSubQuestions.isEmpty) {
+          return groupAnswer.isEmpty;
+        }
+
+        for (final subQuestion in groupSubQuestions) {
+          final subAnswer = groupAnswer[subQuestion.id];
+          if (subAnswer == null) {
+            return true;
+          }
+          if (subAnswer is String && subAnswer.trim().isEmpty) {
+            return true;
+          }
+          if (subAnswer is List<dynamic> && subAnswer.isEmpty) {
+            return true;
+          }
+          if (subAnswer is Map<String, dynamic> && subAnswer.isEmpty) {
+            return true;
+          }
+        }
+        return false;
+      }
+
       if (answer == null) {
         return true;
       }
@@ -330,7 +577,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Failed to start attempt',
+        errorMessage: 'Ujian belum bisa dimulai. Coba lagi.',
         submitState: SubmitState.failed,
       );
     }
@@ -379,7 +626,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       }
       state = state.copyWith(errorMessage: error.message);
     } catch (_) {
-      state = state.copyWith(errorMessage: 'Failed to recover active attempt');
+      state = state.copyWith(errorMessage: 'Sesi ujian belum bisa dipulihkan.');
     }
   }
 
@@ -392,8 +639,19 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       return;
     }
 
+    ApiQuestion? question;
+    for (final item in state.questions) {
+      if (item.id == questionId) {
+        question = item;
+        break;
+      }
+    }
+    final normalizedAnswer = question?.type == QuestionType.group
+        ? normalizeGroupAnswerMap(answer)
+        : answer;
+
     final updated = Map<String, dynamic>.from(state.answersByQuestionId);
-    updated[questionId] = answer;
+    updated[questionId] = normalizedAnswer;
     state = state.copyWith(
       answersByQuestionId: updated,
       syncStatus: SyncStatus.pending,
@@ -403,7 +661,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     await _queue.enqueueAnswer(
       attemptId: attempt.id,
       questionId: questionId,
-      answer: answer,
+      answer: normalizedAnswer,
     );
     await _refreshQueueSnapshot();
     await _persistSession();
@@ -464,7 +722,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       state = state.copyWith(
         submitState: SubmitState.failed,
         isLoading: false,
-        errorMessage: state.errorMessage ?? 'Submit failed. Please retry.',
+        errorMessage: state.errorMessage ?? 'Pengumpulan ujian belum berhasil.',
       );
       await _persistSession();
     }
@@ -492,18 +750,33 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
             clearErrorMessage: true,
           );
         } on ApiError catch (error) {
-          await _queue.markFailure(item.id);
+          final action = await _queue.markFailure(item.id);
+          final dropped = action == OutboxFailureAction.dropped;
           state = state.copyWith(
             connectionState: _resolveConnectionStatus(error),
-            syncStatus: SyncStatus.retrying,
-            errorMessage: error.message,
+            syncStatus: dropped
+                ? SyncStatus.pending
+                : _syncStatusFromFailureAction(action),
+            submitState: dropped && item.type == OutboxItemType.submit
+                ? SubmitState.failed
+                : state.submitState,
+            errorMessage:
+                dropped ? _buildDroppedQueueMessage(item) : error.message,
           );
         } catch (_) {
-          await _queue.markFailure(item.id);
+          final action = await _queue.markFailure(item.id);
+          final dropped = action == OutboxFailureAction.dropped;
           state = state.copyWith(
             connectionState: ConnectionStatus.offline,
-            syncStatus: SyncStatus.retrying,
-            errorMessage: 'Network sync failed, retrying in background.',
+            syncStatus: dropped
+                ? SyncStatus.pending
+                : _syncStatusFromFailureAction(action),
+            submitState: dropped && item.type == OutboxItemType.submit
+                ? SubmitState.failed
+                : state.submitState,
+            errorMessage: dropped
+                ? _buildDroppedQueueMessage(item)
+                : 'Koneksi sedang bermasalah. Sistem akan coba lagi.',
           );
         }
       }
@@ -641,6 +914,24 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       return ConnectionStatus.offline;
     }
     return ConnectionStatus.online;
+  }
+
+  SyncStatus _syncStatusFromFailureAction(OutboxFailureAction action) {
+    if (action == OutboxFailureAction.missing) {
+      return SyncStatus.pending;
+    }
+    return SyncStatus.retrying;
+  }
+
+  String _buildDroppedQueueMessage(OutboxItem item) {
+    switch (item.type) {
+      case OutboxItemType.answer:
+        return 'Autosave gagal setelah beberapa percobaan. Jawab ulang soal ini untuk mengirim kembali.';
+      case OutboxItemType.proctoring:
+        return 'Sebagian event proctoring gagal dikirim setelah batas retry.';
+      case OutboxItemType.submit:
+        return 'Submit gagal setelah beberapa percobaan. Silakan retry submit.';
+    }
   }
 
   void _startRuntimeServices() {

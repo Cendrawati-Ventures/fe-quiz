@@ -56,6 +56,16 @@ class AdminDashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             AppCard(
+              title: 'Student Account Management',
+              subtitle: 'Buat dan hapus akun siswa untuk login ujian.',
+              child: AppButton(
+                label: 'Buka Student Management',
+                variant: AppButtonVariant.secondary,
+                onPressed: () => context.go('/admin/students'),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            AppCard(
               title: 'Result Monitoring',
               subtitle: 'Pantau score dan risk level seluruh peserta.',
               child: AppButton(

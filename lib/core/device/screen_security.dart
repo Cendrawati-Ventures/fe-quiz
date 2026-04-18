@@ -7,14 +7,23 @@ class ScreenSecurity {
   static const MethodChannel _channel = MethodChannel('app.screen_security');
 
   static Future<void> enableSecureFlag() async {
-    await _invokeAndroidOnly('enableSecure');
+    await _invokeExamSecurity(enable: true);
   }
 
   static Future<void> disableSecureFlag() async {
-    await _invokeAndroidOnly('disableSecure');
+    await _invokeExamSecurity(enable: false);
   }
 
-  static Future<void> _invokeAndroidOnly(String method) async {
+  static Future<void> _invokeExamSecurity({required bool enable}) async {
+    final method = enable ? 'enableExamSecurity' : 'disableExamSecurity';
+    final legacyMethod = enable ? 'enableSecure' : 'disableSecure';
+    await _invokeAndroidOnly(method, fallbackMethod: legacyMethod);
+  }
+
+  static Future<void> _invokeAndroidOnly(
+    String method, {
+    String? fallbackMethod,
+  }) async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
       return;
     }
@@ -22,9 +31,13 @@ class ScreenSecurity {
     try {
       await _channel.invokeMethod<void>(method);
     } on MissingPluginException {
-      // Ignore when native bridge is unavailable.
+      if (fallbackMethod != null) {
+        await _invokeAndroidOnly(fallbackMethod);
+      }
     } on PlatformException {
-      // Ignore to avoid blocking exam session when secure flag fails.
+      if (fallbackMethod != null) {
+        await _invokeAndroidOnly(fallbackMethod);
+      }
     }
   }
 }
