@@ -145,6 +145,7 @@ class AuthNotifier extends Notifier<AuthState> {
       );
       await _secureStorage.saveToken(session.token);
       await _secureStorage.saveUser(session.user);
+      await ref.read(examSessionProvider.notifier).clearSession();
       state = AuthState(
         status: AuthStatus.authenticated,
         token: session.token,
@@ -253,6 +254,7 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> logout() async {
     await _secureStorage.clearAuthSession();
+    await ref.read(examSessionProvider.notifier).clearSession();
     ref.invalidate(examListProvider);
     ref.invalidate(subjectListProvider);
     ref.invalidate(myResultsProvider);

@@ -13,7 +13,6 @@ import '../../../core/network/api_error.dart';
 import '../../../core/queue/outbox_queue.dart';
 import '../../../core/storage/app_preferences.dart';
 import '../../../core/utils/debounce.dart';
-import '../../../core/utils/time_sync.dart';
 import '../model/exam_models.dart';
 import '../service/exam_service.dart';
 
@@ -290,6 +289,7 @@ class ExamSessionState {
     this.syncStatus = SyncStatus.synced,
     this.serverOffsetMs = 0,
     this.remainingSeconds = 0,
+    this.serverDeadlineEpochMs,
     this.latestResult,
     this.warningMessage,
     this.errorMessage,
@@ -309,6 +309,7 @@ class ExamSessionState {
   final SyncStatus syncStatus;
   final int serverOffsetMs;
   final int remainingSeconds;
+  final int? serverDeadlineEpochMs;
   final ResultResponse? latestResult;
   final String? warningMessage;
   final String? errorMessage;
@@ -383,6 +384,8 @@ class ExamSessionState {
     SyncStatus? syncStatus,
     int? serverOffsetMs,
     int? remainingSeconds,
+    int? serverDeadlineEpochMs,
+    bool clearServerDeadline = false,
     ResultResponse? latestResult,
     bool clearLatestResult = false,
     String? warningMessage,
@@ -405,6 +408,9 @@ class ExamSessionState {
       syncStatus: syncStatus ?? this.syncStatus,
       serverOffsetMs: serverOffsetMs ?? this.serverOffsetMs,
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
+      serverDeadlineEpochMs: clearServerDeadline
+          ? null
+          : (serverDeadlineEpochMs ?? this.serverDeadlineEpochMs),
       latestResult:
           clearLatestResult ? null : (latestResult ?? this.latestResult),
       warningMessage:
@@ -429,6 +435,7 @@ class ExamSessionState {
       'syncStatus': syncStatus.name,
       'serverOffsetMs': serverOffsetMs,
       'remainingSeconds': remainingSeconds,
+      'serverDeadlineEpochMs': serverDeadlineEpochMs,
       'latestResult': latestResult?.toJson(),
     };
   }
@@ -474,6 +481,8 @@ class ExamSessionState {
       ),
       serverOffsetMs: json['serverOffsetMs'] as int? ?? 0,
       remainingSeconds: json['remainingSeconds'] as int? ?? 0,
+      serverDeadlineEpochMs:
+          (json['serverDeadlineEpochMs'] as num?)?.toInt(),
       latestResult: (json['latestResult'] as Map<String, dynamic>?) == null
           ? null
           : ResultResponse.fromJson(
@@ -484,7 +493,7 @@ class ExamSessionState {
 }
 
 class ExamSessionNotifier extends Notifier<ExamSessionState> {
-  static const String _sessionStateKey = 'exam_session_state_v1';
+  static const String _sessionStateKey = 'exam_session_state_v3';
   static const Duration _saveDebounce = Duration(milliseconds: 700);
   static const Duration _idleTimeout = Duration(seconds: 30);
   static const Duration _noiseInterval = Duration(seconds: 20);
@@ -492,7 +501,6 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
   late final ExamService _service;
   late final OutboxQueue _queue;
   late final AppPreferences _preferences;
-  final TimeSync _timeSync = TimeSync();
   late final Debouncer _saveDebouncer;
 
   Timer? _countdownTimer;
@@ -542,8 +550,12 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       final response = await _service.startAttempt(
         subjectId: subject.id,
       );
+      final serverOffsetMs = _serverOffsetFrom(response.serverNow);
+      final serverDeadlineEpochMs = _resolveServerDeadlineEpochMs(
+        serverNow: response.serverNow,
+        remainingSeconds: response.remainingSeconds,
+      );
 
-      _timeSync.syncFromServerUtc(response.attempt.startTime.toUtc());
       state = state.copyWith(
         isLoading: false,
         exam: null,
@@ -553,7 +565,10 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
         currentQuestionIndex: 0,
         answersByQuestionId: <String, dynamic>{},
         proctoringBuffer: <ProctoringEventPayload>[],
-        serverOffsetMs: _timeSync.serverOffsetMs,
+        serverOffsetMs: serverOffsetMs,
+        remainingSeconds: response.remainingSeconds ?? 0,
+        serverDeadlineEpochMs: serverDeadlineEpochMs,
+        clearServerDeadline: serverDeadlineEpochMs == null,
         submitState: SubmitState.idle,
         syncStatus: SyncStatus.synced,
         connectionState: ConnectionStatus.online,
@@ -562,6 +577,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       );
 
       await _queue.clearByAttempt(response.attempt.id);
+      await _clearOutboxFromOtherAttempts(response.attempt.id);
       await _refreshQueueSnapshot();
       _startRuntimeServices();
       _recalculateTimer();
@@ -606,18 +622,26 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       for (final answer in detail.answers) {
         answers[answer.questionId] = answer.answer;
       }
+      final recoveredServerDeadlineEpochMs = _resolveServerDeadlineEpochMs(
+        serverNow: detail.serverNow,
+        remainingSeconds: detail.remainingSeconds,
+      );
 
       state = state.copyWith(
         attempt: detail.attempt,
         questions: questions,
         answersByQuestionId: answers,
+        serverOffsetMs: _serverOffsetFrom(detail.serverNow),
+        remainingSeconds: detail.remainingSeconds ?? state.remainingSeconds,
+        serverDeadlineEpochMs: recoveredServerDeadlineEpochMs,
+        clearServerDeadline: recoveredServerDeadlineEpochMs == null,
         connectionState: ConnectionStatus.online,
         clearErrorMessage: true,
       );
       _recalculateTimer();
       await _persistSession();
     } on ApiError catch (error) {
-      if (error.statusCode == 401 || error.statusCode == 403) {
+      if (_shouldResetSessionFromApiError(error)) {
         await clearSession();
         return;
       }
@@ -710,12 +734,40 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       clearWarningMessage: true,
     );
 
-    await flushOutbox();
+    // Stop background event producers so submit is not blocked by new proctoring events.
+    _disposeRuntimeServices();
+
+    await _clearOutboxFromOtherAttempts(attempt.id);
+    await flushOutbox(
+      onlyTypes: <OutboxItemType>{OutboxItemType.answer},
+      onlyAttemptId: attempt.id,
+    );
+    final hasPendingAnswers = await _hasPendingAnswersForAttempt(attempt.id);
+    if (hasPendingAnswers) {
+      if (state.hasActiveAttempt && state.remainingSeconds > 0) {
+        _startRuntimeServices();
+      }
+      state = state.copyWith(
+        submitState: SubmitState.failed,
+        isLoading: false,
+        errorMessage:
+            'Sebagian jawaban belum tersinkron. Periksa koneksi lalu coba kumpulkan lagi.',
+      );
+      await _persistSession();
+      return;
+    }
+
     await _queue.enqueueSubmit(attemptId: attempt.id);
     await _refreshQueueSnapshot();
-    await flushOutbox();
+    await flushOutbox(
+      onlyTypes: <OutboxItemType>{OutboxItemType.submit},
+      onlyAttemptId: attempt.id,
+    );
 
     if (state.submitState != SubmitState.success) {
+      if (state.hasActiveAttempt && state.remainingSeconds > 0) {
+        _startRuntimeServices();
+      }
       state = state.copyWith(
         submitState: SubmitState.failed,
         isLoading: false,
@@ -725,19 +777,32 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     }
   }
 
-  Future<void> flushOutbox() async {
+  Future<void> flushOutbox({
+    Set<OutboxItemType>? onlyTypes,
+    String? onlyAttemptId,
+  }) async {
     if (_isFlushing) {
       return;
     }
     _isFlushing = true;
     try {
       final dueItems = await _queue.getDueItems();
-      if (dueItems.isEmpty) {
+      final targetItems = dueItems.where((item) {
+        if (onlyTypes != null && !onlyTypes.contains(item.type)) {
+          return false;
+        }
+        if (onlyAttemptId != null &&
+            item.payload['attemptId'] != onlyAttemptId) {
+          return false;
+        }
+        return true;
+      }).toList();
+      if (targetItems.isEmpty) {
         await _refreshQueueSnapshot();
         return;
       }
 
-      for (final item in dueItems) {
+      for (final item in targetItems) {
         try {
           await _handleOutboxItem(item);
           await _queue.markSuccess(item.id);
@@ -865,6 +930,8 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
           attempt: updatedAttempt,
           isLoading: false,
           syncStatus: SyncStatus.synced,
+          remainingSeconds: 0,
+          clearServerDeadline: true,
           clearWarningMessage: true,
           clearErrorMessage: true,
         );
@@ -884,7 +951,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       return;
     }
 
-    final now = _timeSync.nowServerUtc();
+    final now = _resolveNowServerUtc();
     final event = ProctoringEventPayload(
       attemptId: attempt.id,
       type: type,
@@ -896,8 +963,8 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       ..add(event);
     final cappedBuffer =
         buffer.length > 100 ? buffer.sublist(buffer.length - 100) : buffer;
-    state = state.copyWith(
-      proctoringBuffer: cappedBuffer,
+      state = state.copyWith(
+        proctoringBuffer: cappedBuffer,
       warningMessage: warning,
       syncStatus: SyncStatus.pending,
     );
@@ -918,13 +985,13 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     if (raw == null || raw.isEmpty) {
       return;
     }
+    if (state.attempt != null) {
+      return;
+    }
     try {
       final decoded = jsonDecode(raw);
       if (decoded is Map<String, dynamic>) {
         state = ExamSessionState.fromJson(decoded);
-        _timeSync.syncFromServerEpochMs(
-          DateTime.now().toUtc().millisecondsSinceEpoch + state.serverOffsetMs,
-        );
         _recalculateTimer();
       }
     } catch (_) {
@@ -1062,7 +1129,9 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     _recalculateTimer();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
       _recalculateTimer();
-      if (state.hasActiveAttempt && state.remainingSeconds <= 0) {
+      if (state.hasActiveAttempt &&
+          state.remainingSeconds <= 0 &&
+          state.submitState == SubmitState.idle) {
         state = state.copyWith(
           warningMessage: 'Waktu habis. Jawaban sedang dikumpulkan otomatis.',
         );
@@ -1071,7 +1140,40 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     });
   }
 
+  Future<bool> _hasPendingAnswersForAttempt(String attemptId) async {
+    final rows = await _queue.getItems();
+    for (final row in rows) {
+      if (row.type != OutboxItemType.answer) {
+        continue;
+      }
+      if (row.payload['attemptId'] == attemptId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _clearOutboxFromOtherAttempts(String attemptId) async {
+    final rows = await _queue.getItems();
+    for (final row in rows) {
+      final rowAttemptId = row.payload['attemptId'];
+      if (rowAttemptId == null || rowAttemptId == attemptId) {
+        continue;
+      }
+      await _queue.markSuccess(row.id);
+    }
+    await _refreshQueueSnapshot();
+  }
+
   void _recalculateTimer() {
+    final serverDeadlineEpochMs = state.serverDeadlineEpochMs;
+    if (serverDeadlineEpochMs != null) {
+      final nowMs = _resolveNowServerUtc().millisecondsSinceEpoch;
+      final seconds = max(0, ((serverDeadlineEpochMs - nowMs) / 1000).floor());
+      state = state.copyWith(remainingSeconds: seconds);
+      return;
+    }
+
     final attempt = state.attempt;
     final subject = state.subject;
     if (attempt == null || subject == null) {
@@ -1084,13 +1186,37 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     final closeAt = subject.closeAt?.toUtc();
     final hardDeadline =
         closeAt != null && closeAt.isBefore(byDuration) ? closeAt : byDuration;
-    final nowServer = DateTime.now()
-        .toUtc()
-        .add(Duration(milliseconds: state.serverOffsetMs));
+    final nowServer = _resolveNowServerUtc();
     final seconds = max(
       0,
       hardDeadline.difference(nowServer).inSeconds,
     );
     state = state.copyWith(remainingSeconds: seconds);
+  }
+
+  DateTime _resolveNowServerUtc() {
+    final localUtc = DateTime.now().toUtc();
+    return localUtc.add(Duration(milliseconds: state.serverOffsetMs));
+  }
+
+  int _serverOffsetFrom(DateTime? serverNow) {
+    if (serverNow == null) {
+      return 0;
+    }
+    final normalizedServerNow = serverNow.toUtc();
+    final localUtc = DateTime.now().toUtc();
+    return normalizedServerNow.difference(localUtc).inMilliseconds;
+  }
+
+  int? _resolveServerDeadlineEpochMs({
+    required DateTime? serverNow,
+    required int? remainingSeconds,
+  }) {
+    if (serverNow == null || remainingSeconds == null) {
+      return null;
+    }
+
+    final safeRemainingSeconds = max(0, remainingSeconds);
+    return serverNow.toUtc().millisecondsSinceEpoch + safeRemainingSeconds * 1000;
   }
 }

@@ -501,10 +501,14 @@ class StartAttemptResponse {
   const StartAttemptResponse({
     required this.attempt,
     required this.questions,
+    this.serverNow,
+    this.remainingSeconds,
   });
 
   final ApiAttempt attempt;
   final List<ApiQuestion> questions;
+  final DateTime? serverNow;
+  final int? remainingSeconds;
 
   factory StartAttemptResponse.fromJson(Map<String, dynamic> json) {
     final rawQuestions = (json['questions'] as List<dynamic>? ?? <dynamic>[])
@@ -513,6 +517,10 @@ class StartAttemptResponse {
     return StartAttemptResponse(
       attempt: ApiAttempt.fromJson(json['attempt'] as Map<String, dynamic>),
       questions: rawQuestions.map(ApiQuestion.fromJson).toList(),
+      serverNow: (json['serverNow'] as String?) == null
+          ? null
+          : DateTime.parse(json['serverNow'] as String),
+      remainingSeconds: json['remainingSeconds'] as int?,
     );
   }
 }
@@ -720,10 +728,14 @@ class AttemptDetail {
   const AttemptDetail({
     required this.attempt,
     required this.answers,
+    this.serverNow,
+    this.remainingSeconds,
   });
 
   final ApiAttempt attempt;
   final List<AttemptAnswer> answers;
+  final DateTime? serverNow;
+  final int? remainingSeconds;
 
   factory AttemptDetail.fromJson(Map<String, dynamic> json) {
     final answers = <AttemptAnswer>[];
@@ -741,7 +753,14 @@ class AttemptDetail {
     }
 
     final attempt = ApiAttempt.fromJson(json);
-    return AttemptDetail(attempt: attempt, answers: answers);
+    return AttemptDetail(
+      attempt: attempt,
+      answers: answers,
+      serverNow: (json['serverNow'] as String?) == null
+          ? null
+          : DateTime.parse(json['serverNow'] as String),
+      remainingSeconds: json['remainingSeconds'] as int?,
+    );
   }
 }
 

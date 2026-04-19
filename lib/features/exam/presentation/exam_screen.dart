@@ -136,7 +136,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         onPointerDown: (_) => notifier.onUserInteraction(),
         child: Scaffold(
           appBar: AppBar(
-            title: Text(state.exam?.title ?? 'Ujian'),
+            title: Text(state.subject?.name ?? state.exam?.title ?? 'Ujian'),
             actions: <Widget>[
               Padding(
                 padding: const EdgeInsets.only(right: AppSpacing.md),
@@ -158,6 +158,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
                   isOnline: state.connectionState != ConnectionStatus.offline,
                   syncStatus: state.syncStatus.name,
                 ),
+                const SizedBox(height: AppSpacing.sm),
+                _CountdownPanel(remainingSeconds: state.remainingSeconds),
                 if (state.warningMessage != null) ...<Widget>[
                   const SizedBox(height: AppSpacing.sm),
                   WarningBanner(
@@ -536,4 +538,53 @@ class _OptionView {
 
   final String value;
   final String label;
+}
+
+class _CountdownPanel extends StatelessWidget {
+  const _CountdownPanel({required this.remainingSeconds});
+
+  final int remainingSeconds;
+
+  @override
+  Widget build(BuildContext context) {
+    final isWarning = remainingSeconds <= 300;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: isWarning
+            ? Theme.of(context).colorScheme.error.withValues(alpha: 0.08)
+            : Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+        border: Border.all(
+          color: isWarning
+              ? Theme.of(context).colorScheme.error.withValues(alpha: 0.35)
+              : Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            Icons.timer_rounded,
+            color: isWarning
+                ? Theme.of(context).colorScheme.error
+                : Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            'Sisa Waktu:',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          TimerWidget(
+            remainingSeconds: remainingSeconds,
+            isWarning: isWarning,
+          ),
+        ],
+      ),
+    );
+  }
 }
