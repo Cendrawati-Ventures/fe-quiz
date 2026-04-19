@@ -66,7 +66,6 @@ class AuthService {
   Future<AuthUser> updateMeProfile({
     String? displayName,
     String? fullName,
-    String? className,
     String? rollNumber,
   }) async {
     final payload = <String, dynamic>{};
@@ -75,9 +74,6 @@ class AuthService {
     }
     if (fullName != null) {
       payload['fullName'] = fullName;
-    }
-    if (className != null) {
-      payload['className'] = className;
     }
     if (rollNumber != null) {
       payload['rollNumber'] = rollNumber;

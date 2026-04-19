@@ -42,7 +42,7 @@ class StudentAccountService {
     required String username,
     required String password,
     String? fullName,
-    String? className,
+    String? classId,
     String? rollNumber,
   }) async {
     final payload = <String, dynamic>{
@@ -52,8 +52,8 @@ class StudentAccountService {
     if (fullName != null) {
       payload["fullName"] = fullName;
     }
-    if (className != null) {
-      payload["className"] = className;
+    if (classId != null) {
+      payload["classId"] = classId;
     }
     if (rollNumber != null) {
       payload["rollNumber"] = rollNumber;

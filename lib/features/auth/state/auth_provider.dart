@@ -175,17 +175,12 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<String?> updateStudentIdentity({
     required String fullName,
-    required String className,
     required String rollNumber,
   }) async {
     final trimmedFullName = fullName.trim();
-    final trimmedClassName = className.trim();
     final trimmedRollNumber = rollNumber.trim();
     if (trimmedFullName.isEmpty) {
       return 'Nama wajib diisi.';
-    }
-    if (trimmedClassName.isEmpty) {
-      return 'Kelas wajib diisi.';
     }
     if (trimmedRollNumber.isEmpty) {
       return 'No absen wajib diisi.';
@@ -193,7 +188,6 @@ class AuthNotifier extends Notifier<AuthState> {
 
     return _updateProfile(
       fullName: trimmedFullName,
-      className: trimmedClassName,
       rollNumber: trimmedRollNumber,
       fallbackErrorMessage: 'Data siswa belum berhasil disimpan.',
     );
@@ -202,7 +196,6 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<String?> _updateProfile({
     String? displayName,
     String? fullName,
-    String? className,
     String? rollNumber,
     required String fallbackErrorMessage,
   }) async {
@@ -215,7 +208,6 @@ class AuthNotifier extends Notifier<AuthState> {
       final updatedUser = await _service.updateMeProfile(
         displayName: displayName,
         fullName: fullName,
-        className: className,
         rollNumber: rollNumber,
       );
       await _secureStorage.saveUser(updatedUser);

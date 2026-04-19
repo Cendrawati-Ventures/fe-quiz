@@ -5,6 +5,7 @@ import "../../../app/theme/spacing.dart";
 import "../../../core/network/api_error.dart";
 import "../../../shared/components/app_button.dart";
 import "../../../shared/components/app_card.dart";
+import "../service/classroom_service.dart";
 import "../service/student_account_service.dart";
 import "widgets/admin_layout.dart";
 
@@ -21,9 +22,9 @@ class _AdminStudentAccountManagementScreenState
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _classNameController = TextEditingController();
   final TextEditingController _rollNumberController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  String? _selectedClassId;
 
   bool _isCreating = false;
   String? _deletingStudentId;
@@ -33,7 +34,6 @@ class _AdminStudentAccountManagementScreenState
     _usernameController.dispose();
     _passwordController.dispose();
     _fullNameController.dispose();
-    _classNameController.dispose();
     _rollNumberController.dispose();
     super.dispose();
   }
@@ -55,14 +55,14 @@ class _AdminStudentAccountManagementScreenState
         username: _usernameController.text.trim(),
         password: _passwordController.text,
         fullName: _optionalTrimmed(_fullNameController.text),
-        className: _optionalTrimmed(_classNameController.text),
+        classId: _selectedClassId,
         rollNumber: _optionalTrimmed(_rollNumberController.text),
       );
       _usernameController.clear();
       _passwordController.clear();
       _fullNameController.clear();
-      _classNameController.clear();
       _rollNumberController.clear();
+      _selectedClassId = null;
       ref.invalidate(studentAccountsProvider);
       if (!mounted) {
         return;
@@ -158,6 +158,7 @@ class _AdminStudentAccountManagementScreenState
   @override
   Widget build(BuildContext context) {
     final studentsAsync = ref.watch(studentAccountsProvider);
+    final classesAsync = ref.watch(classListProvider);
 
     return AdminLayout(
       title: "Kelola Akun Siswa",
@@ -230,21 +231,39 @@ class _AdminStudentAccountManagementScreenState
                     },
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  TextFormField(
-                    controller: _classNameController,
-                    textInputAction: TextInputAction.next,
-                    maxLength: 80,
-                    decoration: const InputDecoration(
-                      labelText: "Kelas (opsional)",
-                      hintText: "contoh: XII IPA 2",
-                    ),
-                    validator: (value) {
-                      final text = value?.trim() ?? "";
-                      if (text.length > 80) {
-                        return "Kelas maksimal 80 karakter";
-                      }
-                      return null;
+                  classesAsync.when(
+                    data: (classes) {
+                      return DropdownButtonFormField<String?>(
+                        initialValue: _selectedClassId,
+                        decoration: const InputDecoration(
+                          labelText: "Kelas (opsional)",
+                        ),
+                        items: <DropdownMenuItem<String?>>[
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text("Belum ditetapkan"),
+                          ),
+                          ...classes.map(
+                            (classRoom) => DropdownMenuItem<String?>(
+                              value: classRoom.id,
+                              child: Text(classRoom.name),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedClassId = value;
+                          });
+                        },
+                      );
                     },
+                    loading: () => const LinearProgressIndicator(minHeight: 2),
+                    error: (error, _) => Text(
+                      'Daftar kelas gagal dimuat: $error',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   TextFormField(

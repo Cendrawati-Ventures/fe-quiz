@@ -21,11 +21,13 @@ class _StudentIdentity {
   final String className;
   final String rollNumber;
 
-  bool get isComplete {
-    return name.trim().isNotEmpty &&
-        className.trim().isNotEmpty &&
-        rollNumber.trim().isNotEmpty;
+  bool get hasEditableFieldsComplete {
+    return name.trim().isNotEmpty && rollNumber.trim().isNotEmpty;
   }
+
+  bool get hasAssignedClass => className.trim().isNotEmpty;
+
+  bool get isReadyForExam => hasEditableFieldsComplete && hasAssignedClass;
 
   _StudentIdentity copyWith({
     String? name,
@@ -236,8 +238,9 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
           const SizedBox(height: AppSpacing.md),
           _buildCriticalErrorCard(
             title: 'Mata pelajaran belum tersedia',
-            subtitle:
-                'Guru/admin belum menambahkan mata pelajaran. Hubungi admin untuk melengkapi data.',
+            subtitle: identity.hasAssignedClass
+                ? 'Guru/admin belum menambahkan mata pelajaran. Hubungi admin untuk melengkapi data.'
+                : 'Kelas kamu belum ditetapkan admin, jadi daftar mata pelajaran belum bisa ditampilkan.',
           ),
         ],
       );
@@ -259,7 +262,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     );
 
     final canStart = _canStartSubject(
-      isIdentityComplete: identity.isComplete,
+      isIdentityReady: identity.isReadyForExam,
       attemptsUsed: selectedAttempts,
       attemptLimit: selectedSubject.attemptLimit,
       stat: selectedStat,
@@ -338,7 +341,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                   const SizedBox(height: AppSpacing.sm),
                   if (isCompact)
                     _buildMobileSubjectList(
-                      isIdentityComplete: identity.isComplete,
+                      isIdentityReady: identity.isReadyForExam,
                       subjects: subjects,
                       selectedSubjectId: selectedSubjectId,
                       selectedExam: selectedExam,
@@ -347,7 +350,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                     )
                   else
                     _buildDesktopSubjectTable(
-                      isIdentityComplete: identity.isComplete,
+                      isIdentityReady: identity.isReadyForExam,
                       subjects: subjects,
                       selectedSubjectId: selectedSubjectId,
                       selectedExam: selectedExam,
@@ -373,7 +376,8 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     _subjectStatusText(
-                      isIdentityComplete: identity.isComplete,
+                      isIdentityReady: identity.isReadyForExam,
+                      hasAssignedClass: identity.hasAssignedClass,
                       subject: selectedSubject,
                       stat: selectedStat,
                       attemptsUsed: selectedAttempts,
@@ -505,11 +509,13 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                         isSavingIdentity ? 'Menyimpan...' : 'Isi / Ubah Data'),
                   ),
                   Text(
-                    identity.isComplete
+                    identity.isReadyForExam
                         ? 'Data sudah lengkap. Kamu siap mulai ujian.'
-                        : 'Lengkapi dulu nama, kelas, dan no absen.',
+                        : identity.hasAssignedClass
+                            ? 'Lengkapi dulu nama dan no absen.'
+                            : 'Kelas belum ditetapkan admin. Hubungi guru/admin.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: identity.isComplete
+                          color: identity.isReadyForExam
                               ? const Color(0xFF1B7A42)
                               : const Color(0xFF8A3F28),
                           fontWeight: FontWeight.w600,
@@ -525,7 +531,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   }
 
   Widget _buildDesktopSubjectTable({
-    required bool isIdentityComplete,
+    required bool isIdentityReady,
     required List<ApiSubject> subjects,
     required String selectedSubjectId,
     required ApiExam selectedExam,
@@ -585,7 +591,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
             );
             final isSelected = subject.id == selectedSubjectId;
             final canStart = _canStartSubject(
-              isIdentityComplete: isIdentityComplete,
+              isIdentityReady: isIdentityReady,
               attemptsUsed: attempts,
               attemptLimit: subject.attemptLimit,
               stat: stat,
@@ -655,7 +661,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   }
 
   Widget _buildMobileSubjectList({
-    required bool isIdentityComplete,
+    required bool isIdentityReady,
     required List<ApiSubject> subjects,
     required String selectedSubjectId,
     required ApiExam selectedExam,
@@ -673,7 +679,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
         );
         final selected = subject.id == selectedSubjectId;
         final canStart = _canStartSubject(
-          isIdentityComplete: isIdentityComplete,
+          isIdentityReady: isIdentityReady,
           attemptsUsed: attempts,
           attemptLimit: subject.attemptLimit,
           stat: stat,
@@ -919,12 +925,12 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   }
 
   bool _canStartSubject({
-    required bool isIdentityComplete,
+    required bool isIdentityReady,
     required int attemptsUsed,
     required int attemptLimit,
     required _SubjectQuestionStat stat,
   }) {
-    if (!isIdentityComplete) {
+    if (!isIdentityReady) {
       return false;
     }
     if (attemptsUsed >= attemptLimit) {
@@ -937,12 +943,16 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   }
 
   String _subjectStatusText({
-    required bool isIdentityComplete,
+    required bool isIdentityReady,
+    required bool hasAssignedClass,
     required ApiSubject subject,
     required _SubjectQuestionStat stat,
     required int attemptsUsed,
   }) {
-    if (!isIdentityComplete) {
+    if (!hasAssignedClass) {
+      return 'Kelas belum ditetapkan admin. Hubungi guru/admin.';
+    }
+    if (!isIdentityReady) {
       return 'Lengkapi data anak dulu sebelum mulai ujian.';
     }
     if (attemptsUsed >= subject.attemptLimit) {
@@ -973,7 +983,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     if (user == null || user.role != UserRole.siswa) {
       return;
     }
-    if (identity.isComplete ||
+    if (identity.hasEditableFieldsComplete ||
         isSavingIdentity ||
         _isIdentityDialogOpen ||
         _identityPromptScheduled) {
@@ -1011,15 +1021,25 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     }
 
     final currentIdentity = _identityFromUser(ref.read(authProvider).user);
-    if (!currentIdentity.isComplete) {
+    if (!currentIdentity.hasEditableFieldsComplete) {
       await _showIdentityDialog(isRequired: true);
       if (!mounted) {
         return;
       }
       final refreshedIdentity = _identityFromUser(ref.read(authProvider).user);
-      if (!refreshedIdentity.isComplete) {
+      if (!refreshedIdentity.hasEditableFieldsComplete) {
         return;
       }
+    }
+
+    final latestIdentity = _identityFromUser(ref.read(authProvider).user);
+    if (!latestIdentity.hasAssignedClass) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kelas belum ditetapkan admin. Hubungi guru/admin.'),
+        ),
+      );
+      return;
     }
 
     setState(() {
@@ -1079,7 +1099,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
         final error =
             await ref.read(authProvider.notifier).updateStudentIdentity(
                   fullName: updated.name,
-                  className: updated.className,
                   rollNumber: updated.rollNumber,
                 );
         if (!mounted) {
@@ -1321,19 +1340,9 @@ class _StudentIdentityDialogState extends State<_StudentIdentityDialog> {
                 const SizedBox(height: AppSpacing.sm),
                 TextFormField(
                   controller: _classController,
-                  textInputAction: TextInputAction.next,
                   maxLength: 80,
                   decoration: const InputDecoration(labelText: 'Kelas'),
-                  validator: (value) {
-                    final text = (value ?? '').trim();
-                    if (text.isEmpty) {
-                      return 'Kelas wajib diisi';
-                    }
-                    if (text.length > 80) {
-                      return 'Kelas maksimal 80 karakter';
-                    }
-                    return null;
-                  },
+                  enabled: false,
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextFormField(
@@ -1358,7 +1367,6 @@ class _StudentIdentityDialogState extends State<_StudentIdentityDialog> {
                     Navigator.of(context).pop(
                       widget.initial.copyWith(
                         name: _nameController.text.trim(),
-                        className: _classController.text.trim(),
                         rollNumber: _rollController.text.trim(),
                       ),
                     );
@@ -1382,7 +1390,6 @@ class _StudentIdentityDialogState extends State<_StudentIdentityDialog> {
               Navigator.of(context).pop(
                 widget.initial.copyWith(
                   name: _nameController.text.trim(),
-                  className: _classController.text.trim(),
                   rollNumber: _rollController.text.trim(),
                 ),
               );

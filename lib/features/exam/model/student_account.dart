@@ -4,6 +4,7 @@ class StudentAccount {
     required this.username,
     required this.displayName,
     required this.fullName,
+    required this.classId,
     required this.className,
     required this.rollNumber,
     required this.role,
@@ -13,6 +14,7 @@ class StudentAccount {
   final String username;
   final String? displayName;
   final String? fullName;
+  final String? classId;
   final String? className;
   final String? rollNumber;
   final String role;
@@ -23,6 +25,7 @@ class StudentAccount {
       username: json["username"] as String,
       displayName: json["displayName"] as String?,
       fullName: json["fullName"] as String?,
+      classId: json["classId"] as String?,
       className: json["className"] as String?,
       rollNumber: json["rollNumber"] as String?,
       role: json["role"] as String? ?? "siswa",

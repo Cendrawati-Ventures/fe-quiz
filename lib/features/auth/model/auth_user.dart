@@ -26,6 +26,7 @@ class AuthUser {
     required this.username,
     required this.displayName,
     required this.fullName,
+    required this.classId,
     required this.className,
     required this.rollNumber,
     required this.role,
@@ -35,6 +36,7 @@ class AuthUser {
   final String username;
   final String? displayName;
   final String? fullName;
+  final String? classId;
   final String? className;
   final String? rollNumber;
   final UserRole role;
@@ -62,6 +64,7 @@ class AuthUser {
       username: json['username'] as String,
       displayName: json['displayName'] as String?,
       fullName: json['fullName'] as String?,
+      classId: json['classId'] as String?,
       className: json['className'] as String?,
       rollNumber: json['rollNumber'] as String?,
       role: userRoleFromString(json['role'] as String),
@@ -74,6 +77,7 @@ class AuthUser {
       'username': username,
       'displayName': displayName,
       'fullName': fullName,
+      'classId': classId,
       'className': className,
       'rollNumber': rollNumber,
       'role': userRoleToString(role),
