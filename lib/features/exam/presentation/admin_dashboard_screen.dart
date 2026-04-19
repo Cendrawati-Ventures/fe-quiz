@@ -30,9 +30,9 @@ class AdminDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userName =
-        ref.watch(authProvider.select((state) => state.user?.username)) ??
-            'Admin';
+    final userName = ref.watch(
+            authProvider.select((state) => state.user?.effectiveDisplayName)) ??
+        'Admin';
     final subjectsAsync = ref.watch(subjectListProvider);
     final resultsAsync = ref.watch(adminResultsProvider);
     final studentsAsync = ref.watch(studentAccountsProvider);

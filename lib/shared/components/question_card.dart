@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../app/theme/spacing.dart';
@@ -18,6 +21,7 @@ class QuestionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final imageBytes = _decodeImageData(question.imageData);
 
     return Card(
       elevation: 0,
@@ -54,9 +58,44 @@ class QuestionCard extends StatelessWidget {
                     height: 1.45,
                   ),
             ),
+            if (imageBytes != null) ...<Widget>[
+              const SizedBox(height: AppSpacing.sm),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.memory(
+                  imageBytes,
+                  height: 200,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  Uint8List? _decodeImageData(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) {
+      return null;
+    }
+
+    final match =
+        RegExp(r'^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$').firstMatch(value);
+    if (match == null) {
+      return null;
+    }
+
+    final encoded = match.group(1);
+    if (encoded == null || encoded.isEmpty) {
+      return null;
+    }
+
+    try {
+      return base64Decode(encoded);
+    } catch (_) {
+      return null;
+    }
   }
 }

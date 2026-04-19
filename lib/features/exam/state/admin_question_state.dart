@@ -52,33 +52,31 @@ final adminQuestionActionProvider =
 );
 
 class AdminQuestionActionNotifier extends Notifier<AdminQuestionActionState> {
-  static const List<AdminQuestionOption> _defaultOptions =
-      <AdminQuestionOption>[
-    AdminQuestionOption(value: 'A', label: 'Opsi A'),
-    AdminQuestionOption(value: 'B', label: 'Opsi B'),
-    AdminQuestionOption(value: 'C', label: 'Opsi C'),
-    AdminQuestionOption(value: 'D', label: 'Opsi D'),
-  ];
-
   @override
   AdminQuestionActionState build() {
     return const AdminQuestionActionState();
   }
 
-  Future<AdminQuestion?> quickCreate({
+  Future<AdminQuestion?> create({
     required String subjectId,
+    required QuestionType type,
     required String text,
     required num weight,
+    required Object options,
+    required Object correctAnswer,
+    String? imageData,
   }) async {
     state = state.copyWith(isCreating: true, clearError: true);
     try {
       final service = ref.read(examServiceProvider);
       final created = await service.createQuestion(
         subjectId: subjectId,
+        type: type,
         text: text,
         weight: weight,
-        options: _defaultOptions,
-        correctAnswer: 'A',
+        options: options,
+        correctAnswer: correctAnswer,
+        imageData: imageData,
       );
       state = state.copyWith(isCreating: false, clearError: true);
       ref.invalidate(questionListBySubjectProvider(subjectId));
@@ -98,20 +96,24 @@ class AdminQuestionActionNotifier extends Notifier<AdminQuestionActionState> {
   Future<AdminQuestion?> update({
     required String subjectId,
     required String questionId,
+    required QuestionType type,
     required String text,
     required num weight,
-    required List<AdminQuestionOption> options,
-    required String correctAnswer,
+    required Object options,
+    required Object correctAnswer,
+    String? imageData,
   }) async {
     state = state.copyWith(isUpdating: true, clearError: true);
     try {
       final service = ref.read(examServiceProvider);
       final updated = await service.updateQuestion(
         id: questionId,
+        type: type,
         text: text,
         weight: weight,
         options: options,
         correctAnswer: correctAnswer,
+        imageData: imageData,
       );
       state = state.copyWith(isUpdating: false, clearError: true);
       ref.invalidate(questionListBySubjectProvider(subjectId));

@@ -41,14 +41,28 @@ class StudentAccountService {
   Future<StudentAccount> createStudent({
     required String username,
     required String password,
+    String? fullName,
+    String? className,
+    String? rollNumber,
   }) async {
+    final payload = <String, dynamic>{
+      "username": username,
+      "password": password,
+    };
+    if (fullName != null) {
+      payload["fullName"] = fullName;
+    }
+    if (className != null) {
+      payload["className"] = className;
+    }
+    if (rollNumber != null) {
+      payload["rollNumber"] = rollNumber;
+    }
+
     try {
       final response = await _dio.post<dynamic>(
         "/students",
-        data: <String, dynamic>{
-          "username": username,
-          "password": password,
-        },
+        data: payload,
       );
       final data = response.data;
       if (data is Map<String, dynamic>) {

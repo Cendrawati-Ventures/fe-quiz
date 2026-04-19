@@ -20,6 +20,9 @@ class _AdminStudentAccountManagementScreenState
     extends ConsumerState<AdminStudentAccountManagementScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _classNameController = TextEditingController();
+  final TextEditingController _rollNumberController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   bool _isCreating = false;
@@ -29,6 +32,9 @@ class _AdminStudentAccountManagementScreenState
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _fullNameController.dispose();
+    _classNameController.dispose();
+    _rollNumberController.dispose();
     super.dispose();
   }
 
@@ -48,9 +54,15 @@ class _AdminStudentAccountManagementScreenState
       await service.createStudent(
         username: _usernameController.text.trim(),
         password: _passwordController.text,
+        fullName: _optionalTrimmed(_fullNameController.text),
+        className: _optionalTrimmed(_classNameController.text),
+        rollNumber: _optionalTrimmed(_rollNumberController.text),
       );
       _usernameController.clear();
       _passwordController.clear();
+      _fullNameController.clear();
+      _classNameController.clear();
+      _rollNumberController.clear();
       ref.invalidate(studentAccountsProvider);
       if (!mounted) {
         return;
@@ -72,6 +84,14 @@ class _AdminStudentAccountManagementScreenState
         });
       }
     }
+  }
+
+  String? _optionalTrimmed(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed;
   }
 
   Future<void> _deleteStudent({
@@ -176,6 +196,7 @@ class _AdminStudentAccountManagementScreenState
                   TextFormField(
                     controller: _passwordController,
                     obscureText: true,
+                    textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
                       labelText: "Kata Sandi",
                       hintText: "Minimal 6 karakter",
@@ -187,6 +208,57 @@ class _AdminStudentAccountManagementScreenState
                       }
                       if (text.length < 6) {
                         return "Kata sandi minimal 6 karakter";
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: _fullNameController,
+                    textInputAction: TextInputAction.next,
+                    maxLength: 120,
+                    decoration: const InputDecoration(
+                      labelText: "Nama Siswa (opsional)",
+                      hintText: "contoh: Rusdy Setiawan",
+                    ),
+                    validator: (value) {
+                      final text = value?.trim() ?? "";
+                      if (text.length > 120) {
+                        return "Nama maksimal 120 karakter";
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: _classNameController,
+                    textInputAction: TextInputAction.next,
+                    maxLength: 80,
+                    decoration: const InputDecoration(
+                      labelText: "Kelas (opsional)",
+                      hintText: "contoh: XII IPA 2",
+                    ),
+                    validator: (value) {
+                      final text = value?.trim() ?? "";
+                      if (text.length > 80) {
+                        return "Kelas maksimal 80 karakter";
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: _rollNumberController,
+                    textInputAction: TextInputAction.done,
+                    maxLength: 30,
+                    decoration: const InputDecoration(
+                      labelText: "No Absen (opsional)",
+                      hintText: "contoh: 12",
+                    ),
+                    validator: (value) {
+                      final text = value?.trim() ?? "";
+                      if (text.length > 30) {
+                        return "No absen maksimal 30 karakter";
                       }
                       return null;
                     },
@@ -233,22 +305,42 @@ class _AdminStudentAccountManagementScreenState
                   itemBuilder: (context, index) {
                     final item = students[index];
                     final deleting = _deletingStudentId == item.id;
+                    final displayName = item.fullName?.trim().isNotEmpty == true
+                        ? item.fullName!.trim()
+                        : item.username;
+                    final className = item.className?.trim();
+                    final rollNumber = item.rollNumber?.trim();
+
                     return AppCard(
-                      title: item.username,
-                      subtitle: "Peran: ${item.role}",
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: AppButton(
-                          label: "Hapus",
-                          variant: AppButtonVariant.secondary,
-                          loading: deleting,
-                          onPressed: deleting
-                              ? null
-                              : () => _deleteStudent(
-                                    studentId: item.id,
-                                    username: item.username,
-                                  ),
-                        ),
+                      title: displayName,
+                      subtitle:
+                          "Username: ${item.username} - Peran: ${item.role}",
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          Text(
+                            "Kelas: ${(className == null || className.isEmpty) ? '-' : className}",
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            "No Absen: ${(rollNumber == null || rollNumber.isEmpty) ? '-' : rollNumber}",
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: AppButton(
+                              label: "Hapus",
+                              variant: AppButtonVariant.secondary,
+                              loading: deleting,
+                              onPressed: deleting
+                                  ? null
+                                  : () => _deleteStudent(
+                                        studentId: item.id,
+                                        username: item.username,
+                                      ),
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   },

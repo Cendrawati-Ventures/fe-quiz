@@ -162,6 +162,81 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  Future<String?> updateDisplayName(String displayName) async {
+    final trimmed = displayName.trim();
+    if (trimmed.isEmpty) {
+      return 'Nama tampilan wajib diisi.';
+    }
+    return _updateProfile(
+      displayName: trimmed,
+      fallbackErrorMessage: 'Nama profil belum berhasil diperbarui.',
+    );
+  }
+
+  Future<String?> updateStudentIdentity({
+    required String fullName,
+    required String className,
+    required String rollNumber,
+  }) async {
+    final trimmedFullName = fullName.trim();
+    final trimmedClassName = className.trim();
+    final trimmedRollNumber = rollNumber.trim();
+    if (trimmedFullName.isEmpty) {
+      return 'Nama wajib diisi.';
+    }
+    if (trimmedClassName.isEmpty) {
+      return 'Kelas wajib diisi.';
+    }
+    if (trimmedRollNumber.isEmpty) {
+      return 'No absen wajib diisi.';
+    }
+
+    return _updateProfile(
+      fullName: trimmedFullName,
+      className: trimmedClassName,
+      rollNumber: trimmedRollNumber,
+      fallbackErrorMessage: 'Data siswa belum berhasil disimpan.',
+    );
+  }
+
+  Future<String?> _updateProfile({
+    String? displayName,
+    String? fullName,
+    String? className,
+    String? rollNumber,
+    required String fallbackErrorMessage,
+  }) async {
+    if (state.status != AuthStatus.authenticated || state.user == null) {
+      return 'Sesi login tidak ditemukan. Silakan login ulang.';
+    }
+
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final updatedUser = await _service.updateMeProfile(
+        displayName: displayName,
+        fullName: fullName,
+        className: className,
+        rollNumber: rollNumber,
+      );
+      await _secureStorage.saveUser(updatedUser);
+      state = state.copyWith(
+        user: updatedUser,
+        isLoading: false,
+        clearError: true,
+      );
+      return null;
+    } on ApiError catch (error) {
+      state = state.copyWith(isLoading: false, errorMessage: error.message);
+      return error.message;
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: fallbackErrorMessage,
+      );
+      return fallbackErrorMessage;
+    }
+  }
+
   Future<void> logout() async {
     await _secureStorage.clearAuthSession();
     state = const AuthState(status: AuthStatus.unauthenticated);

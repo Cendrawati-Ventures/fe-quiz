@@ -83,12 +83,8 @@ class ExamListScreen extends ConsumerStatefulWidget {
 }
 
 class _ExamListScreenState extends ConsumerState<ExamListScreen> {
-  _StudentIdentity _identity = const _StudentIdentity(
-    name: '',
-    className: '',
-    rollNumber: '',
-  );
-  bool _identitySeeded = false;
+  bool _identityPromptScheduled = false;
+  bool _isIdentityDialogOpen = false;
   String? _selectedExamId;
   String? _selectedSubjectId;
   bool _isStartingExam = false;
@@ -98,11 +94,14 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final username = user?.username ?? 'siswa';
-
-    if (!_identitySeeded) {
-      _identitySeeded = true;
-      _identity = _identity.copyWith(name: _displayNameFromUsername(username));
-    }
+    final identity = _identityFromUser(user);
+    final isSavingIdentity =
+        authState.status == AuthStatus.authenticated && authState.isLoading;
+    _scheduleIdentityPromptIfNeeded(
+      user: user,
+      identity: identity,
+      isSavingIdentity: isSavingIdentity,
+    );
 
     final examsAsync = ref.watch(examListProvider);
     final subjectsAsync = ref.watch(subjectListProvider);
@@ -136,6 +135,8 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                         child: _buildBody(
                           context: context,
                           user: user,
+                          identity: identity,
+                          isSavingIdentity: isSavingIdentity,
                           examsAsync: examsAsync,
                           subjectsAsync: subjectsAsync,
                           resultsAsync: resultsAsync,
@@ -156,6 +157,8 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   Widget _buildBody({
     required BuildContext context,
     required AuthUser? user,
+    required _StudentIdentity identity,
+    required bool isSavingIdentity,
     required AsyncValue<List<ApiExam>> examsAsync,
     required AsyncValue<List<ApiSubject>> subjectsAsync,
     required AsyncValue<List<ResultResponse>> resultsAsync,
@@ -208,7 +211,10 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          _buildIdentityCard(),
+          _buildIdentityCard(
+            identity: identity,
+            isSavingIdentity: isSavingIdentity,
+          ),
           const SizedBox(height: AppSpacing.md),
           _buildCriticalErrorCard(
             title: 'Belum ada ujian aktif',
@@ -223,7 +229,10 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          _buildIdentityCard(),
+          _buildIdentityCard(
+            identity: identity,
+            isSavingIdentity: isSavingIdentity,
+          ),
           const SizedBox(height: AppSpacing.md),
           _buildCriticalErrorCard(
             title: 'Mata pelajaran belum tersedia',
@@ -250,6 +259,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     );
 
     final canStart = _canStartSubject(
+      isIdentityComplete: identity.isComplete,
       attemptsUsed: selectedAttempts,
       attemptLimit: selectedSubject.attemptLimit,
       stat: selectedStat,
@@ -258,7 +268,10 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        _buildIdentityCard(),
+        _buildIdentityCard(
+          identity: identity,
+          isSavingIdentity: isSavingIdentity,
+        ),
         const SizedBox(height: AppSpacing.md),
         Container(
           padding: const EdgeInsets.all(AppSpacing.md),
@@ -276,7 +289,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                   _sectionTag('LANGKAH 1'),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Selamat datang, ${user?.username ?? 'siswa'}',
+                    'Selamat datang, ${identity.name.trim().isEmpty ? (user?.username ?? 'siswa') : identity.name}',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: const Color(0xFF3F341F),
@@ -325,6 +338,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                   const SizedBox(height: AppSpacing.sm),
                   if (isCompact)
                     _buildMobileSubjectList(
+                      isIdentityComplete: identity.isComplete,
                       subjects: subjects,
                       selectedSubjectId: selectedSubjectId,
                       selectedExam: selectedExam,
@@ -333,6 +347,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                     )
                   else
                     _buildDesktopSubjectTable(
+                      isIdentityComplete: identity.isComplete,
                       subjects: subjects,
                       selectedSubjectId: selectedSubjectId,
                       selectedExam: selectedExam,
@@ -358,6 +373,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     _subjectStatusText(
+                      isIdentityComplete: identity.isComplete,
                       subject: selectedSubject,
                       stat: selectedStat,
                       attemptsUsed: selectedAttempts,
@@ -408,7 +424,10 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     );
   }
 
-  Widget _buildIdentityCard() {
+  Widget _buildIdentityCard({
+    required _StudentIdentity identity,
+    required bool isSavingIdentity,
+  }) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -440,30 +459,30 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
               if (compact) ...<Widget>[
-                _identityField(label: 'NAMA', value: _identity.name),
+                _identityField(label: 'NAMA', value: identity.name),
                 const SizedBox(height: AppSpacing.sm),
-                _identityField(label: 'KELAS', value: _identity.className),
+                _identityField(label: 'KELAS', value: identity.className),
                 const SizedBox(height: AppSpacing.sm),
-                _identityField(label: 'NO ABSEN', value: _identity.rollNumber),
+                _identityField(label: 'NO ABSEN', value: identity.rollNumber),
               ] else
                 Row(
                   children: <Widget>[
                     Expanded(
                       child:
-                          _identityField(label: 'NAMA', value: _identity.name),
+                          _identityField(label: 'NAMA', value: identity.name),
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: _identityField(
                         label: 'KELAS',
-                        value: _identity.className,
+                        value: identity.className,
                       ),
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: _identityField(
                         label: 'NO ABSEN',
-                        value: _identity.rollNumber,
+                        value: identity.rollNumber,
                       ),
                     ),
                   ],
@@ -475,19 +494,22 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                 runSpacing: AppSpacing.sm,
                 children: <Widget>[
                   OutlinedButton(
-                    onPressed: _showIdentityDialog,
+                    onPressed: isSavingIdentity
+                        ? null
+                        : () => _showIdentityDialog(isRequired: false),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF148B4A),
                       side: const BorderSide(color: Color(0xFF95CAA9)),
                     ),
-                    child: const Text('Isi / Ubah Data'),
+                    child: Text(
+                        isSavingIdentity ? 'Menyimpan...' : 'Isi / Ubah Data'),
                   ),
                   Text(
-                    _identity.isComplete
+                    identity.isComplete
                         ? 'Data sudah lengkap. Kamu siap mulai ujian.'
                         : 'Lengkapi dulu nama, kelas, dan no absen.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: _identity.isComplete
+                          color: identity.isComplete
                               ? const Color(0xFF1B7A42)
                               : const Color(0xFF8A3F28),
                           fontWeight: FontWeight.w600,
@@ -503,6 +525,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   }
 
   Widget _buildDesktopSubjectTable({
+    required bool isIdentityComplete,
     required List<ApiSubject> subjects,
     required String selectedSubjectId,
     required ApiExam selectedExam,
@@ -562,6 +585,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
             );
             final isSelected = subject.id == selectedSubjectId;
             final canStart = _canStartSubject(
+              isIdentityComplete: isIdentityComplete,
               attemptsUsed: attempts,
               attemptLimit: subject.attemptLimit,
               stat: stat,
@@ -631,6 +655,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   }
 
   Widget _buildMobileSubjectList({
+    required bool isIdentityComplete,
     required List<ApiSubject> subjects,
     required String selectedSubjectId,
     required ApiExam selectedExam,
@@ -648,6 +673,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
         );
         final selected = subject.id == selectedSubjectId;
         final canStart = _canStartSubject(
+          isIdentityComplete: isIdentityComplete,
           attemptsUsed: attempts,
           attemptLimit: subject.attemptLimit,
           stat: stat,
@@ -893,11 +919,12 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   }
 
   bool _canStartSubject({
+    required bool isIdentityComplete,
     required int attemptsUsed,
     required int attemptLimit,
     required _SubjectQuestionStat stat,
   }) {
-    if (!_identity.isComplete) {
+    if (!isIdentityComplete) {
       return false;
     }
     if (attemptsUsed >= attemptLimit) {
@@ -910,11 +937,12 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   }
 
   String _subjectStatusText({
+    required bool isIdentityComplete,
     required ApiSubject subject,
     required _SubjectQuestionStat stat,
     required int attemptsUsed,
   }) {
-    if (!_identity.isComplete) {
+    if (!isIdentityComplete) {
       return 'Lengkapi data anak dulu sebelum mulai ujian.';
     }
     if (attemptsUsed >= subject.attemptLimit) {
@@ -937,12 +965,61 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     return value.toStringAsFixed(1);
   }
 
+  void _scheduleIdentityPromptIfNeeded({
+    required AuthUser? user,
+    required _StudentIdentity identity,
+    required bool isSavingIdentity,
+  }) {
+    if (user == null || user.role != UserRole.siswa) {
+      return;
+    }
+    if (identity.isComplete ||
+        isSavingIdentity ||
+        _isIdentityDialogOpen ||
+        _identityPromptScheduled) {
+      return;
+    }
+
+    _identityPromptScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _identityPromptScheduled = false;
+      if (!mounted) {
+        return;
+      }
+      await _showIdentityDialog(isRequired: true);
+    });
+  }
+
+  _StudentIdentity _identityFromUser(AuthUser? user) {
+    return _StudentIdentity(
+      name: _normalizedIdentityField(user?.fullName),
+      className: _normalizedIdentityField(user?.className),
+      rollNumber: _normalizedIdentityField(user?.rollNumber),
+    );
+  }
+
+  String _normalizedIdentityField(String? value) {
+    return value?.trim() ?? '';
+  }
+
   Future<void> _startExam({
     required ApiExam exam,
     required ApiSubject subject,
   }) async {
     if (_isStartingExam) {
       return;
+    }
+
+    final currentIdentity = _identityFromUser(ref.read(authProvider).user);
+    if (!currentIdentity.isComplete) {
+      await _showIdentityDialog(isRequired: true);
+      if (!mounted) {
+        return;
+      }
+      final refreshedIdentity = _identityFromUser(ref.read(authProvider).user);
+      if (!refreshedIdentity.isComplete) {
+        return;
+      }
     }
 
     setState(() {
@@ -974,43 +1051,64 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     );
   }
 
-  Future<void> _showIdentityDialog() async {
-    final updated = await showDialog<_StudentIdentity>(
-      context: context,
-      builder: (context) => _StudentIdentityDialog(initial: _identity),
-    );
-
-    if (updated != null) {
-      setState(() {
-        _identity = updated;
-      });
-    }
-  }
-
-  String _displayNameFromUsername(String username) {
-    final cleaned = username.trim();
-    if (cleaned.isEmpty) {
-      return '';
+  Future<void> _showIdentityDialog({required bool isRequired}) async {
+    if (_isIdentityDialogOpen) {
+      return;
     }
 
-    final words = cleaned
-        .replaceAll(RegExp(r'[_\-.]+'), ' ')
-        .split(RegExp(r'\s+'))
-        .where((word) => word.trim().isNotEmpty)
-        .toList();
+    _isIdentityDialogOpen = true;
+    try {
+      while (mounted) {
+        final user = ref.read(authProvider).user;
+        if (user == null) {
+          return;
+        }
+        final initial = _identityFromUser(user);
+        final updated = await showDialog<_StudentIdentity>(
+          context: context,
+          barrierDismissible: !isRequired,
+          builder: (context) => _StudentIdentityDialog(
+            initial: initial,
+            requiredFill: isRequired,
+          ),
+        );
+        if (updated == null) {
+          return;
+        }
 
-    if (words.isEmpty) {
-      return cleaned;
+        final error =
+            await ref.read(authProvider.notifier).updateStudentIdentity(
+                  fullName: updated.name,
+                  className: updated.className,
+                  rollNumber: updated.rollNumber,
+                );
+        if (!mounted) {
+          return;
+        }
+
+        if (error == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isRequired
+                    ? 'Data siswa berhasil disimpan.'
+                    : 'Data siswa berhasil diperbarui.',
+              ),
+            ),
+          );
+          return;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+        if (!isRequired) {
+          return;
+        }
+      }
+    } finally {
+      _isIdentityDialogOpen = false;
     }
-
-    final transformed = words.map((word) {
-      final lower = word.toLowerCase();
-      final first = lower.substring(0, 1).toUpperCase();
-      final tail = lower.length > 1 ? lower.substring(1) : '';
-      return '$first$tail';
-    }).toList();
-
-    return transformed.join(' ');
   }
 
   void _confirmLogout() async {
@@ -1156,9 +1254,13 @@ class _StudentTopBar extends StatelessWidget {
 }
 
 class _StudentIdentityDialog extends StatefulWidget {
-  const _StudentIdentityDialog({required this.initial});
+  const _StudentIdentityDialog({
+    required this.initial,
+    required this.requiredFill,
+  });
 
   final _StudentIdentity initial;
+  final bool requiredFill;
 
   @override
   State<_StudentIdentityDialog> createState() => _StudentIdentityDialogState();
@@ -1188,71 +1290,107 @@ class _StudentIdentityDialogState extends State<_StudentIdentityDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Isi Data Siswa'),
-      content: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Nama'),
-                validator: (value) {
-                  if ((value ?? '').trim().isEmpty) {
-                    return 'Nama wajib diisi';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextFormField(
-                controller: _classController,
-                decoration: const InputDecoration(labelText: 'Kelas'),
-                validator: (value) {
-                  if ((value ?? '').trim().isEmpty) {
-                    return 'Kelas wajib diisi';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextFormField(
-                controller: _rollController,
-                decoration: const InputDecoration(labelText: 'No Absen'),
-                validator: (value) {
-                  if ((value ?? '').trim().isEmpty) {
-                    return 'No absen wajib diisi';
-                  }
-                  return null;
-                },
-              ),
-            ],
+    return PopScope(
+      canPop: !widget.requiredFill,
+      child: AlertDialog(
+        title: Text(
+          widget.requiredFill ? 'Lengkapi Data Siswa' : 'Ubah Data Siswa',
+        ),
+        content: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                TextFormField(
+                  controller: _nameController,
+                  textInputAction: TextInputAction.next,
+                  maxLength: 120,
+                  decoration: const InputDecoration(labelText: 'Nama'),
+                  validator: (value) {
+                    final text = (value ?? '').trim();
+                    if (text.isEmpty) {
+                      return 'Nama wajib diisi';
+                    }
+                    if (text.length > 120) {
+                      return 'Nama maksimal 120 karakter';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextFormField(
+                  controller: _classController,
+                  textInputAction: TextInputAction.next,
+                  maxLength: 80,
+                  decoration: const InputDecoration(labelText: 'Kelas'),
+                  validator: (value) {
+                    final text = (value ?? '').trim();
+                    if (text.isEmpty) {
+                      return 'Kelas wajib diisi';
+                    }
+                    if (text.length > 80) {
+                      return 'Kelas maksimal 80 karakter';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextFormField(
+                  controller: _rollController,
+                  textInputAction: TextInputAction.done,
+                  maxLength: 30,
+                  decoration: const InputDecoration(labelText: 'No Absen'),
+                  validator: (value) {
+                    final text = (value ?? '').trim();
+                    if (text.isEmpty) {
+                      return 'No absen wajib diisi';
+                    }
+                    if (text.length > 30) {
+                      return 'No absen maksimal 30 karakter';
+                    }
+                    return null;
+                  },
+                  onFieldSubmitted: (_) {
+                    if (!(_formKey.currentState?.validate() ?? false)) {
+                      return;
+                    }
+                    Navigator.of(context).pop(
+                      widget.initial.copyWith(
+                        name: _nameController.text.trim(),
+                        className: _classController.text.trim(),
+                        rollNumber: _rollController.text.trim(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
+        actions: <Widget>[
+          if (!widget.requiredFill)
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Batal'),
+            ),
+          FilledButton(
+            onPressed: () {
+              if (!(_formKey.currentState?.validate() ?? false)) {
+                return;
+              }
+              Navigator.of(context).pop(
+                widget.initial.copyWith(
+                  name: _nameController.text.trim(),
+                  className: _classController.text.trim(),
+                  rollNumber: _rollController.text.trim(),
+                ),
+              );
+            },
+            child: const Text('Simpan'),
+          ),
+        ],
       ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Batal'),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (!(_formKey.currentState?.validate() ?? false)) {
-              return;
-            }
-            Navigator.of(context).pop(
-              widget.initial.copyWith(
-                name: _nameController.text.trim(),
-                className: _classController.text.trim(),
-                rollNumber: _rollController.text.trim(),
-              ),
-            );
-          },
-          child: const Text('Simpan'),
-        ),
-      ],
     );
   }
 }

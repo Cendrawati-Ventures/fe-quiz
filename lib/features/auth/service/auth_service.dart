@@ -62,4 +62,48 @@ class AuthService {
       throw ApiError.fromDioException(error);
     }
   }
+
+  Future<AuthUser> updateMeProfile({
+    String? displayName,
+    String? fullName,
+    String? className,
+    String? rollNumber,
+  }) async {
+    final payload = <String, dynamic>{};
+    if (displayName != null) {
+      payload['displayName'] = displayName;
+    }
+    if (fullName != null) {
+      payload['fullName'] = fullName;
+    }
+    if (className != null) {
+      payload['className'] = className;
+    }
+    if (rollNumber != null) {
+      payload['rollNumber'] = rollNumber;
+    }
+
+    if (payload.isEmpty) {
+      throw ApiError(message: 'Tidak ada data profil yang dikirim.');
+    }
+
+    try {
+      final response = await _dio.put<dynamic>(
+        '/users/me',
+        data: payload,
+        options: Options(
+          connectTimeout: _authConnectTimeout,
+          sendTimeout: _authSendTimeout,
+          receiveTimeout: _authReceiveTimeout,
+        ),
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return AuthUser.fromJson(data);
+      }
+      throw ApiError(message: 'Profil belum bisa diperbarui.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
 }

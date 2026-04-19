@@ -206,20 +206,23 @@ class ExamService {
 
   Future<AdminQuestion> createQuestion({
     required String subjectId,
+    required QuestionType type,
     required String text,
     required num weight,
-    required List<AdminQuestionOption> options,
-    required String correctAnswer,
+    required Object options,
+    required Object correctAnswer,
+    String? imageData,
   }) async {
     try {
       final response = await _dio.post<dynamic>(
         '/api/questions',
         data: <String, dynamic>{
           'subjectId': subjectId,
-          'type': 'single',
+          'type': questionTypeToString(type),
           'text': text,
-          'options': options.map((item) => item.toJson()).toList(),
+          'options': options,
           'correctAnswer': correctAnswer,
+          'imageData': imageData,
           'weight': weight,
         },
         options: _writeOptions(),
@@ -236,19 +239,22 @@ class ExamService {
 
   Future<AdminQuestion> updateQuestion({
     required String id,
+    required QuestionType type,
     required String text,
     required num weight,
-    required List<AdminQuestionOption> options,
-    required String correctAnswer,
+    required Object options,
+    required Object correctAnswer,
+    String? imageData,
   }) async {
     try {
       final response = await _dio.put<dynamic>(
         '/api/questions/$id',
         data: <String, dynamic>{
-          'type': 'single',
+          'type': questionTypeToString(type),
           'text': text,
-          'options': options.map((item) => item.toJson()).toList(),
+          'options': options,
           'correctAnswer': correctAnswer,
+          'imageData': imageData,
           'weight': weight,
         },
         options: _writeOptions(),

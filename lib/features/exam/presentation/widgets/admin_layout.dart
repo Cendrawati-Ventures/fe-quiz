@@ -30,9 +30,11 @@ class AdminLayout extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final width = MediaQuery.sizeOf(context).width;
     final isDesktop = width >= 980;
-    final username =
-        ref.watch(authProvider.select((state) => state.user?.username)) ??
-            'Admin';
+    final user = ref.watch(authProvider.select((state) => state.user));
+    final displayName = user?.effectiveDisplayName ?? 'Admin';
+    final username = user?.username ?? 'admin';
+    final isUpdatingDisplayName = ref.watch(authProvider.select((state) =>
+        state.status == AuthStatus.authenticated && state.isLoading));
 
     void logout() async {
       final confirmed = await _showLogoutConfirmationDialog(
@@ -54,6 +56,31 @@ class AdminLayout extends ConsumerWidget {
       }
     }
 
+    void editDisplayName() async {
+      final initial = user?.displayName?.trim().isNotEmpty == true
+          ? user!.displayName!.trim()
+          : username;
+      final nextDisplayName = await _showEditDisplayNameDialog(
+        context,
+        initialValue: initial,
+      );
+      if (nextDisplayName == null || nextDisplayName.trim().isEmpty) {
+        return;
+      }
+
+      final error = await ref
+          .read(authProvider.notifier)
+          .updateDisplayName(nextDisplayName);
+      if (!context.mounted) {
+        return;
+      }
+
+      final message = error ?? 'Nama admin berhasil diperbarui.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
+
     if (!isDesktop) {
       return Scaffold(
         appBar: AppBar(
@@ -71,7 +98,10 @@ class AdminLayout extends ConsumerWidget {
           child: SafeArea(
             child: _AdminSidebar(
               activeSection: activeSection,
+              displayName: displayName,
               username: username,
+              isUpdatingDisplayName: isUpdatingDisplayName,
+              onEditDisplayName: editDisplayName,
               onNavigate: navigateTo,
               onLogout: logout,
             ),
@@ -92,7 +122,10 @@ class AdminLayout extends ConsumerWidget {
               width: 286,
               child: _AdminSidebar(
                 activeSection: activeSection,
+                displayName: displayName,
                 username: username,
+                isUpdatingDisplayName: isUpdatingDisplayName,
+                onEditDisplayName: editDisplayName,
                 onNavigate: navigateTo,
                 onLogout: logout,
               ),
@@ -211,13 +244,19 @@ class _DesktopHeader extends StatelessWidget {
 class _AdminSidebar extends StatelessWidget {
   const _AdminSidebar({
     required this.activeSection,
+    required this.displayName,
     required this.username,
+    required this.isUpdatingDisplayName,
+    required this.onEditDisplayName,
     required this.onNavigate,
     required this.onLogout,
   });
 
   final AdminSection activeSection;
+  final String displayName;
   final String username;
+  final bool isUpdatingDisplayName;
+  final VoidCallback onEditDisplayName;
   final ValueChanged<String> onNavigate;
   final VoidCallback onLogout;
 
@@ -376,12 +415,42 @@ class _AdminSidebar extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      username,
+                      displayName,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+                    if (displayName.trim().toLowerCase() !=
+                        username.trim().toLowerCase()) ...<Widget>[
+                      const SizedBox(height: 2),
+                      Text(
+                        '@$username',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.sm),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed:
+                            isUpdatingDisplayName ? null : onEditDisplayName,
+                        icon: isUpdatingDisplayName
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.edit_rounded, size: 18),
+                        label: Text(
+                          isUpdatingDisplayName ? 'Menyimpan...' : 'Ubah Nama',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -442,6 +511,90 @@ String _formatDate(DateTime date) {
   final day = days[date.weekday - 1];
   final month = months[date.month - 1];
   return '$day, ${date.day} $month ${date.year}';
+}
+
+Future<String?> _showEditDisplayNameDialog(
+  BuildContext context, {
+  required String initialValue,
+}) async {
+  return showDialog<String>(
+    context: context,
+    builder: (context) => _EditDisplayNameDialog(initialValue: initialValue),
+  );
+}
+
+class _EditDisplayNameDialog extends StatefulWidget {
+  const _EditDisplayNameDialog({required this.initialValue});
+
+  final String initialValue;
+
+  @override
+  State<_EditDisplayNameDialog> createState() => _EditDisplayNameDialogState();
+}
+
+class _EditDisplayNameDialogState extends State<_EditDisplayNameDialog> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+    Navigator.of(context).pop(_controller.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Ubah Nama Admin'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _controller,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(
+            labelText: 'Nama Tampilan',
+            hintText: 'Contoh: Bu Rini',
+          ),
+          maxLength: 120,
+          validator: (value) {
+            final trimmed = value?.trim() ?? '';
+            if (trimmed.isEmpty) {
+              return 'Nama tampilan wajib diisi';
+            }
+            if (trimmed.length > 120) {
+              return 'Nama tampilan maksimal 120 karakter';
+            }
+            return null;
+          },
+          onFieldSubmitted: (_) => _submit(),
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Batal'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Simpan'),
+        ),
+      ],
+    );
+  }
 }
 
 Future<bool> _showLogoutConfirmationDialog(

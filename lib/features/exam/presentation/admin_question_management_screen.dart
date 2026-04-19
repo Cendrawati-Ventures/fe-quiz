@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +14,6 @@ import '../model/exam_models.dart';
 import '../state/admin_question_state.dart';
 import '../state/exam_state.dart';
 import 'widgets/admin_layout.dart';
-import 'widgets/question_form_fields.dart';
 
 class AdminQuestionManagementScreen extends ConsumerStatefulWidget {
   const AdminQuestionManagementScreen({
@@ -275,7 +277,7 @@ class _AdminQuestionManagementScreenState
                                 overflow: TextOverflow.ellipsis,
                               ),
                               subtitle: Text(
-                                'Poin: ${question.weight} | Jawaban Benar: ${question.correctAnswer}',
+                                'Tipe: ${adminQuestionTypeLabel(question.type)} | Bobot: ${question.weight}',
                               ),
                               trailing: ReorderableDragStartListener(
                                 index: index,
@@ -328,6 +330,8 @@ class _QuickCreateQuestionDialogState
   final TextEditingController _questionController = TextEditingController();
   final TextEditingController _weightController =
       TextEditingController(text: '10');
+  QuestionType _selectedType = QuestionType.single;
+  String? _imageData;
 
   @override
   void dispose() {
@@ -341,12 +345,16 @@ class _QuickCreateQuestionDialogState
       return;
     }
 
-    final created =
-        await ref.read(adminQuestionActionProvider.notifier).quickCreate(
-              subjectId: widget.subjectId,
-              text: _questionController.text.trim(),
-              weight: int.parse(_weightController.text.trim()),
-            );
+    final payload = _buildInitialPayload(_selectedType);
+    final created = await ref.read(adminQuestionActionProvider.notifier).create(
+          subjectId: widget.subjectId,
+          type: _selectedType,
+          text: _questionController.text.trim(),
+          weight: int.parse(_weightController.text.trim()),
+          options: payload.options,
+          correctAnswer: payload.correctAnswer,
+          imageData: _imageData,
+        );
 
     if (!mounted) {
       return;
@@ -373,9 +381,32 @@ class _QuickCreateQuestionDialogState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             const Text(
-              'Isi data utama dulu (teks soal dan poin). Opsi jawaban bisa dilengkapi di halaman edit.',
+              'Pilih tipe soal lalu isi data utama. Detail opsi/jawaban dapat dilengkapi pada halaman edit.',
             ),
             const SizedBox(height: AppSpacing.md),
+            DropdownButtonFormField<QuestionType>(
+              initialValue: _selectedType,
+              decoration: const InputDecoration(
+                labelText: 'Tipe Soal',
+              ),
+              items: QuestionType.values
+                  .map(
+                    (type) => DropdownMenuItem<QuestionType>(
+                      value: type,
+                      child: Text(adminQuestionTypeLabel(type)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                setState(() {
+                  _selectedType = value;
+                });
+              },
+            ),
+            const SizedBox(height: AppSpacing.sm),
             TextFormField(
               controller: _questionController,
               decoration: const InputDecoration(
@@ -384,7 +415,7 @@ class _QuickCreateQuestionDialogState
               ),
               minLines: 2,
               maxLines: 5,
-              validator: QuestionFormFields.validateQuestionText,
+              validator: _validateQuestionText,
             ),
             const SizedBox(height: AppSpacing.sm),
             TextFormField(
@@ -400,8 +431,10 @@ class _QuickCreateQuestionDialogState
               inputFormatters: <TextInputFormatter>[
                 FilteringTextInputFormatter.digitsOnly,
               ],
-              validator: QuestionFormFields.validateWeight,
+              validator: _validateWeight,
             ),
+            const SizedBox(height: AppSpacing.md),
+            _buildImageInput(),
           ],
         ),
       ),
@@ -424,4 +457,218 @@ class _QuickCreateQuestionDialogState
       ],
     );
   }
+
+  _InitialQuestionPayload _buildInitialPayload(QuestionType type) {
+    final defaultOptions = adminDefaultQuestionOptions
+        .map((option) => option.toJson())
+        .toList(growable: false);
+
+    if (type == QuestionType.single) {
+      return _InitialQuestionPayload(
+        options: defaultOptions,
+        correctAnswer: 'A',
+      );
+    }
+
+    if (type == QuestionType.multi) {
+      return _InitialQuestionPayload(
+        options: defaultOptions,
+        correctAnswer: <String>['A'],
+      );
+    }
+
+    return _InitialQuestionPayload(
+      options: <String, dynamic>{
+        'parentText': '',
+        'subQuestions': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 'item-1',
+            'text': 'Sub-soal 1',
+            'type': 'single',
+            'options': defaultOptions,
+          },
+        ],
+      },
+      correctAnswer: <String, dynamic>{
+        'item-1': 'A',
+      },
+    );
+  }
+
+  Widget _buildImageInput() {
+    final imageBytes = _decodeImageData(_imageData);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          'Gambar Soal (Opsional)',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Maksimal 2MB',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        if (imageBytes != null)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.memory(
+              imageBytes,
+              height: 130,
+              fit: BoxFit.contain,
+            ),
+          )
+        else
+          Container(
+            height: 90,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: const Text('Belum ada gambar'),
+          ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _pickImage,
+                child: Text(imageBytes == null ? 'Pilih Gambar' : 'Ganti Gambar'),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: imageBytes == null
+                    ? null
+                    : () {
+                        setState(() {
+                          _imageData = null;
+                        });
+                      },
+                child: const Text('Hapus'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickImage() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+      withData: true,
+    );
+    if (!mounted || picked == null || picked.files.isEmpty) {
+      return;
+    }
+
+    final file = picked.files.first;
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      AppSnackBar.error(context, 'Gagal membaca file gambar.');
+      return;
+    }
+
+    if (bytes.length > 2 * 1024 * 1024) {
+      AppSnackBar.error(context, 'Ukuran gambar maksimal 2MB.');
+      return;
+    }
+
+    final mime = _guessImageMimeType(file.name);
+    if (mime == null) {
+      AppSnackBar.error(context, 'Format gambar tidak didukung.');
+      return;
+    }
+
+    setState(() {
+      _imageData = 'data:$mime;base64,${base64Encode(bytes)}';
+    });
+  }
+
+  String? _guessImageMimeType(String? fileName) {
+    final name = (fileName ?? '').trim().toLowerCase();
+    if (name.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    }
+    if (name.endsWith('.webp')) {
+      return 'image/webp';
+    }
+    if (name.endsWith('.gif')) {
+      return 'image/gif';
+    }
+    if (name.endsWith('.bmp')) {
+      return 'image/bmp';
+    }
+    return null;
+  }
+
+  Uint8List? _decodeImageData(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) {
+      return null;
+    }
+
+    final match = RegExp(r'^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$').firstMatch(value);
+    if (match == null) {
+      return null;
+    }
+
+    final encoded = match.group(1);
+    if (encoded == null || encoded.isEmpty) {
+      return null;
+    }
+
+    try {
+      return base64Decode(encoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _validateQuestionText(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) {
+      return 'Teks soal wajib diisi.';
+    }
+    if (text.length < 3) {
+      return 'Teks soal minimal 3 karakter.';
+    }
+    return null;
+  }
+
+  String? _validateWeight(String? value) {
+    final text = value?.trim() ?? '';
+    final number = int.tryParse(text);
+    if (number == null) {
+      return 'Poin harus berupa angka.';
+    }
+    if (number <= 0) {
+      return 'Poin harus lebih dari 0.';
+    }
+    if (number > 100) {
+      return 'Poin maksimal 100.';
+    }
+    return null;
+  }
+}
+
+class _InitialQuestionPayload {
+  const _InitialQuestionPayload({
+    required this.options,
+    required this.correctAnswer,
+  });
+
+  final Object options;
+  final Object correctAnswer;
 }
