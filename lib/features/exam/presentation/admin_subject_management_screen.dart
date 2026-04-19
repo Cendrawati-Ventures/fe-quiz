@@ -22,6 +22,35 @@ class AdminSubjectManagementScreen extends ConsumerStatefulWidget {
 
 class _AdminSubjectManagementScreenState
     extends ConsumerState<AdminSubjectManagementScreen> {
+  String _formatDateTime(DateTime? value) {
+    if (value == null) {
+      return '-';
+    }
+    final local = value.toLocal();
+    final date =
+        '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+    final time =
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    return '$date $time';
+  }
+
+  String _scheduleStatus(ApiSubject item) {
+    final now = DateTime.now().toUtc();
+    final publishAt = item.publishAt?.toUtc();
+    final closeAt = item.closeAt?.toUtc();
+
+    if (publishAt == null || closeAt == null) {
+      return 'Jadwal publish/close belum diatur';
+    }
+    if (now.isBefore(publishAt)) {
+      return 'Terjadwal (belum publish)';
+    }
+    if (now.isAfter(closeAt)) {
+      return 'Closed';
+    }
+    return 'Aktif';
+  }
+
   Future<void> _showQuickCreateDialog() async {
     final created = await showDialog<ApiSubject>(
       context: context,
@@ -34,7 +63,7 @@ class _AdminSubjectManagementScreenState
 
     AppSnackBar.success(
       context,
-      'Mata pelajaran berhasil dibuat. Lanjutkan dengan pengaturan lengkap.',
+      'Ujian berhasil dibuat. Lanjutkan dengan pengaturan lengkap.',
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -48,14 +77,14 @@ class _AdminSubjectManagementScreenState
   Widget build(BuildContext context) {
     final subjectsAsync = ref.watch(subjectListProvider);
     return AdminLayout(
-      title: 'Kelola Mata Pelajaran',
-      subtitle: 'Atur data materi, durasi, dan batas percobaan.',
+      title: 'Kelola Ujian',
+      subtitle: 'Atur data ujian, jadwal publish-close, dan batas percobaan.',
       activeSection: AdminSection.subjects,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           AppButton(
-            label: 'Buat Mata Pelajaran Cepat',
+            label: 'Buat Ujian Cepat',
             onPressed: _showQuickCreateDialog,
           ),
           const SizedBox(height: AppSpacing.md),
@@ -64,8 +93,8 @@ class _AdminSubjectManagementScreenState
               data: (subjects) {
                 if (subjects.isEmpty) {
                   return const AppCard(
-                    title: 'Mata pelajaran masih kosong',
-                    subtitle: 'Belum ada mata pelajaran.',
+                    title: 'Ujian masih kosong',
+                    subtitle: 'Belum ada ujian.',
                   );
                 }
                 return ListView.separated(
@@ -77,12 +106,12 @@ class _AdminSubjectManagementScreenState
                     return AppCard(
                       title: item.name,
                       subtitle:
-                          '${item.description}\nDurasi: ${item.durationMinutes} menit\nBatas percobaan: ${item.attemptLimit}',
+                          '${item.description}\nPublish: ${_formatDateTime(item.publishAt)}\nClose: ${_formatDateTime(item.closeAt)}\nDurasi: ${item.durationMinutes} menit\nBatas percobaan: ${item.attemptLimit}',
                       status: item.allowReview
-                          ? 'Siswa boleh meninjau jawaban'
-                          : 'Siswa tidak boleh meninjau jawaban',
+                          ? 'Siswa boleh meninjau jawaban - ${_scheduleStatus(item)}'
+                          : 'Siswa tidak boleh meninjau jawaban - ${_scheduleStatus(item)}',
                       child: AppButton(
-                        label: 'Ubah Mata Pelajaran',
+                        label: 'Ubah Ujian',
                         variant: AppButtonVariant.secondary,
                         onPressed: () =>
                             context.push('/admin/subjects/${item.id}/edit'),
@@ -93,9 +122,8 @@ class _AdminSubjectManagementScreenState
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, __) => const AppCard(
-                title: 'Gagal memuat mata pelajaran',
-                subtitle:
-                    'Data mata pelajaran belum bisa dimuat. Coba lagi sebentar.',
+                title: 'Gagal memuat ujian',
+                subtitle: 'Data ujian belum bisa dimuat. Coba lagi sebentar.',
               ),
             ),
           ),
@@ -120,6 +148,8 @@ class _QuickCreateSubjectDialogState
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _durationController =
       TextEditingController(text: '90');
+  DateTime? _publishAt = DateTime.now();
+  DateTime? _closeAt = DateTime.now().add(const Duration(hours: 2));
 
   @override
   void dispose() {
@@ -139,6 +169,8 @@ class _QuickCreateSubjectDialogState
               name: _nameController.text.trim(),
               description: _descriptionController.text.trim(),
               durationMinutes: int.parse(_durationController.text.trim()),
+              publishAt: _publishAt!,
+              closeAt: _closeAt!,
             );
 
     if (!mounted) {
@@ -151,15 +183,20 @@ class _QuickCreateSubjectDialogState
     }
 
     final error = ref.read(adminSubjectActionProvider).errorMessage;
-    AppSnackBar.error(context, error ?? 'Gagal membuat mata pelajaran.');
+    AppSnackBar.error(context, error ?? 'Gagal membuat ujian.');
   }
 
   @override
   Widget build(BuildContext context) {
     final actionState = ref.watch(adminSubjectActionProvider);
+    final publishAt = _publishAt;
+    final closeAt = _closeAt;
+    final scheduleInvalid = publishAt == null ||
+        closeAt == null ||
+        !closeAt.isAfter(publishAt);
 
     return AlertDialog(
-      title: const Text('Buat Mata Pelajaran Cepat'),
+      title: const Text('Buat Ujian Cepat'),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -168,14 +205,38 @@ class _QuickCreateSubjectDialogState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const Text(
-                'Isi data dasar dulu (nama, deskripsi, durasi). Setelah dibuat, kamu akan langsung masuk ke halaman pengaturan lengkap.',
+                'Isi data dasar dulu (nama, deskripsi, publish-close, durasi). Setelah dibuat, kamu bisa lanjut ke pengaturan lengkap.',
               ),
               const SizedBox(height: AppSpacing.md),
               SubjectFormFields(
                 nameController: _nameController,
                 descriptionController: _descriptionController,
                 durationMinutesController: _durationController,
+                publishAt: publishAt,
+                closeAt: closeAt,
+                onPublishAtChanged: (value) {
+                  setState(() {
+                    _publishAt = value;
+                    if (_closeAt != null && !_closeAt!.isAfter(value)) {
+                      _closeAt = value.add(const Duration(hours: 1));
+                    }
+                  });
+                },
+                onCloseAtChanged: (value) {
+                  setState(() {
+                    _closeAt = value;
+                  });
+                },
               ),
+              if (scheduleInvalid) ...<Widget>[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Waktu close harus setelah publish.',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -187,7 +248,7 @@ class _QuickCreateSubjectDialogState
           child: const Text('Batal'),
         ),
         FilledButton(
-          onPressed: actionState.isCreating ? null : _submit,
+          onPressed: actionState.isCreating || scheduleInvalid ? null : _submit,
           child: actionState.isCreating
               ? const SizedBox(
                   width: 18,

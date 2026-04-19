@@ -13,11 +13,13 @@ import '../state/exam_state.dart';
 class _StudentIdentity {
   const _StudentIdentity({
     required this.name,
+    required this.classId,
     required this.className,
     required this.rollNumber,
   });
 
   final String name;
+  final String classId;
   final String className;
   final String rollNumber;
 
@@ -25,17 +27,20 @@ class _StudentIdentity {
     return name.trim().isNotEmpty && rollNumber.trim().isNotEmpty;
   }
 
-  bool get hasAssignedClass => className.trim().isNotEmpty;
+  bool get hasAssignedClass =>
+      classId.trim().isNotEmpty || className.trim().isNotEmpty;
 
   bool get isReadyForExam => hasEditableFieldsComplete && hasAssignedClass;
 
   _StudentIdentity copyWith({
     String? name,
+    String? classId,
     String? className,
     String? rollNumber,
   }) {
     return _StudentIdentity(
       name: name ?? this.name,
+      classId: classId ?? this.classId,
       className: className ?? this.className,
       rollNumber: rollNumber ?? this.rollNumber,
     );
@@ -87,9 +92,21 @@ class ExamListScreen extends ConsumerStatefulWidget {
 class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   bool _identityPromptScheduled = false;
   bool _isIdentityDialogOpen = false;
-  String? _selectedExamId;
   String? _selectedSubjectId;
   bool _isStartingExam = false;
+  bool _hasTriggeredInitialRefresh = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _hasTriggeredInitialRefresh) {
+        return;
+      }
+      _hasTriggeredInitialRefresh = true;
+      _refreshAll();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +122,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
       isSavingIdentity: isSavingIdentity,
     );
 
-    final examsAsync = ref.watch(examListProvider);
     final subjectsAsync = ref.watch(subjectListProvider);
     final resultsAsync = ref.watch(myResultsProvider);
     final statsAsync = ref.watch(subjectQuestionStatsProvider);
@@ -139,7 +155,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                           user: user,
                           identity: identity,
                           isSavingIdentity: isSavingIdentity,
-                          examsAsync: examsAsync,
                           subjectsAsync: subjectsAsync,
                           resultsAsync: resultsAsync,
                           statsAsync: statsAsync,
@@ -161,38 +176,24 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     required AuthUser? user,
     required _StudentIdentity identity,
     required bool isSavingIdentity,
-    required AsyncValue<List<ApiExam>> examsAsync,
     required AsyncValue<List<ApiSubject>> subjectsAsync,
     required AsyncValue<List<ResultResponse>> resultsAsync,
     required AsyncValue<Map<String, _SubjectQuestionStat>> statsAsync,
   }) {
-    final examsError = examsAsync.hasError ? examsAsync.error : null;
-    if (examsError != null) {
-      return _buildCriticalErrorCard(
-        title: 'Data ujian belum bisa dimuat',
-        subtitle: examsError.toString(),
-      );
-    }
-
     final subjectsError = subjectsAsync.hasError ? subjectsAsync.error : null;
     if (subjectsError != null) {
       return _buildCriticalErrorCard(
-        title: 'Data mata pelajaran belum bisa dimuat',
+        title: 'Data ujian belum bisa dimuat',
         subtitle: subjectsError.toString(),
       );
     }
 
-    final examsLoading = examsAsync.isLoading;
     final subjectsLoading = subjectsAsync.isLoading;
 
-    if (examsLoading || subjectsLoading) {
+    if (subjectsLoading) {
       return _buildLoadingCard();
     }
 
-    final exams = examsAsync.maybeWhen(
-      data: (items) => items,
-      orElse: () => const <ApiExam>[],
-    );
     final subjects = subjectsAsync.maybeWhen(
       data: (items) => items,
       orElse: () => const <ApiSubject>[],
@@ -209,24 +210,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     final resultWarning = resultsAsync.hasError ? resultsAsync.error : null;
     final statWarning = statsAsync.hasError ? statsAsync.error : null;
 
-    if (exams.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          _buildIdentityCard(
-            identity: identity,
-            isSavingIdentity: isSavingIdentity,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _buildCriticalErrorCard(
-            title: 'Belum ada ujian aktif',
-            subtitle:
-                'Guru/admin perlu membuat dan mempublikasikan ujian lebih dulu agar tampil di akun siswa.',
-          ),
-        ],
-      );
-    }
-
     if (subjects.isEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -237,19 +220,16 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
           ),
           const SizedBox(height: AppSpacing.md),
           _buildCriticalErrorCard(
-            title: 'Mata pelajaran belum tersedia',
+            title: 'Ujian belum tersedia',
             subtitle: identity.hasAssignedClass
-                ? 'Guru/admin belum menambahkan mata pelajaran. Hubungi admin untuk melengkapi data.'
-                : 'Kelas kamu belum ditetapkan admin, jadi daftar mata pelajaran belum bisa ditampilkan.',
+                ? 'Guru/admin belum menambahkan ujian. Hubungi admin untuk melengkapi data.'
+                : 'Kelas kamu belum ditetapkan admin, jadi daftar ujian belum bisa ditampilkan.',
           ),
         ],
       );
     }
 
-    final selectedExamId = _resolveExamId(exams);
     final selectedSubjectId = _resolveSubjectId(subjects);
-
-    final selectedExam = exams.firstWhere((item) => item.id == selectedExamId);
     final selectedSubject =
         subjects.firstWhere((item) => item.id == selectedSubjectId);
 
@@ -258,7 +238,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     final selectedAttempts = _attemptCount(
       results: results,
       subject: selectedSubject,
-      exam: selectedExam,
     );
 
     final canStart = _canStartSubject(
@@ -300,39 +279,14 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Pilih mata pelajaran yang ingin kamu kerjakan dan baca ringkasannya sebelum menekan Mulai Ujian.',
+                    'Pilih ujian yang ingin kamu kerjakan dan baca ringkasannya sebelum menekan Mulai Ujian.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFF6C624F),
                         ),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  if (exams.length > 1) ...<Widget>[
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedExamId,
-                      decoration: const InputDecoration(
-                        labelText: 'Pilih Ujian Aktif',
-                      ),
-                      items: exams
-                          .map(
-                            (exam) => DropdownMenuItem<String>(
-                              value: exam.id,
-                              child: Text(exam.title),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setState(() {
-                          _selectedExamId = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
                   Text(
-                    'Daftar Mata Pelajaran',
+                    'Daftar Ujian',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: const Color(0xFF3F341F),
@@ -344,7 +298,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                       isIdentityReady: identity.isReadyForExam,
                       subjects: subjects,
                       selectedSubjectId: selectedSubjectId,
-                      selectedExam: selectedExam,
                       results: results,
                       stats: stats,
                     )
@@ -353,7 +306,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                       isIdentityReady: identity.isReadyForExam,
                       subjects: subjects,
                       selectedSubjectId: selectedSubjectId,
-                      selectedExam: selectedExam,
                       results: results,
                       stats: stats,
                     ),
@@ -369,7 +321,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                     loading: _isStartingExam,
                     disabled: !canStart,
                     onPressed: () => _startExam(
-                      exam: selectedExam,
                       subject: selectedSubject,
                     ),
                   ),
@@ -534,7 +485,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     required bool isIdentityReady,
     required List<ApiSubject> subjects,
     required String selectedSubjectId,
-    required ApiExam selectedExam,
     required List<ResultResponse> results,
     required Map<String, _SubjectQuestionStat> stats,
   }) {
@@ -563,8 +513,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
             child: Row(
               children: <Widget>[
                 Expanded(
-                    flex: 17,
-                    child: Text('Mata Pelajaran', style: headerStyle)),
+                    flex: 17, child: Text('Ujian', style: headerStyle)),
                 Expanded(flex: 9, child: Text('Durasi', style: headerStyle)),
                 Expanded(
                   flex: 13,
@@ -587,7 +536,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
             final attempts = _attemptCount(
               results: results,
               subject: subject,
-              exam: selectedExam,
             );
             final isSelected = subject.id == selectedSubjectId;
             final canStart = _canStartSubject(
@@ -664,7 +612,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     required bool isIdentityReady,
     required List<ApiSubject> subjects,
     required String selectedSubjectId,
-    required ApiExam selectedExam,
     required List<ResultResponse> results,
     required Map<String, _SubjectQuestionStat> stats,
   }) {
@@ -675,7 +622,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
         final attempts = _attemptCount(
           results: results,
           subject: subject,
-          exam: selectedExam,
         );
         final selected = subject.id == selectedSubjectId;
         final canStart = _canStartSubject(
@@ -861,32 +807,17 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   }
 
   Future<void> _refreshAll() async {
-    ref.invalidate(examListProvider);
+    await ref.read(authProvider.notifier).refreshProfile();
     ref.invalidate(subjectListProvider);
     ref.invalidate(myResultsProvider);
     ref.invalidate(subjectQuestionStatsProvider);
 
-    try {
-      await ref.read(examListProvider.future);
-    } catch (_) {}
     try {
       await ref.read(subjectListProvider.future);
     } catch (_) {}
     try {
       await ref.read(myResultsProvider.future);
     } catch (_) {}
-  }
-
-  String _resolveExamId(List<ApiExam> exams) {
-    final selectedId = _selectedExamId;
-    if (selectedId != null) {
-      for (final item in exams) {
-        if (item.id == selectedId) {
-          return selectedId;
-        }
-      }
-    }
-    return exams.first.id;
   }
 
   String _resolveSubjectId(List<ApiSubject> subjects) {
@@ -904,19 +835,13 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   int _attemptCount({
     required List<ResultResponse> results,
     required ApiSubject subject,
-    required ApiExam exam,
   }) {
     final targetSubject = subject.name.trim().toLowerCase();
-    final targetExam = exam.title.trim().toLowerCase();
 
     var count = 0;
     for (final item in results) {
       final subjectName = (item.subjectName ?? '').trim().toLowerCase();
       if (subjectName != targetSubject) {
-        continue;
-      }
-      final examName = (item.examTitle ?? '').trim().toLowerCase();
-      if (examName.isNotEmpty && examName != targetExam) {
         continue;
       }
       count += 1;
@@ -959,12 +884,12 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
       return 'Batas percobaan untuk ${subject.name} sudah habis (${subject.attemptLimit}x).';
     }
     if (stat.questionCount <= 0) {
-      return 'Mata pelajaran ${subject.name} belum memiliki soal.';
+      return 'Ujian ${subject.name} belum memiliki soal.';
     }
     if ((stat.totalWeight - 100).abs() >= 0.001) {
       return 'Bobot soal ${subject.name} baru ${_formatWeight(stat.totalWeight)}/100. Hubungi guru/admin.';
     }
-    return 'Mata pelajaran ${subject.name} siap. Percobaan kamu $attemptsUsed/${subject.attemptLimit}. Tekan Mulai Ujian saat siap.';
+    return 'Ujian ${subject.name} siap. Percobaan kamu $attemptsUsed/${subject.attemptLimit}. Tekan Mulai Ujian saat siap.';
   }
 
   String _formatWeight(num value) {
@@ -1003,6 +928,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   _StudentIdentity _identityFromUser(AuthUser? user) {
     return _StudentIdentity(
       name: _normalizedIdentityField(user?.fullName),
+      classId: _normalizedIdentityField(user?.classId),
       className: _normalizedIdentityField(user?.className),
       rollNumber: _normalizedIdentityField(user?.rollNumber),
     );
@@ -1013,7 +939,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   }
 
   Future<void> _startExam({
-    required ApiExam exam,
     required ApiSubject subject,
   }) async {
     if (_isStartingExam) {
@@ -1034,6 +959,28 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
 
     final latestIdentity = _identityFromUser(ref.read(authProvider).user);
     if (!latestIdentity.hasAssignedClass) {
+      await ref.read(authProvider.notifier).refreshProfile();
+      if (!mounted) {
+        return;
+      }
+      final refreshedIdentity = _identityFromUser(ref.read(authProvider).user);
+      if (refreshedIdentity.hasAssignedClass) {
+        await _refreshAll();
+        if (!mounted) {
+          return;
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Kelas belum ditetapkan admin. Hubungi guru/admin.'),
+          ),
+        );
+        return;
+      }
+    }
+
+    final identityAfterRefresh = _identityFromUser(ref.read(authProvider).user);
+    if (!identityAfterRefresh.hasAssignedClass) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Kelas belum ditetapkan admin. Hubungi guru/admin.'),
@@ -1047,7 +994,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     });
 
     await ref.read(examSessionProvider.notifier).startAttempt(
-          exam: exam,
           subject: subject,
         );
 

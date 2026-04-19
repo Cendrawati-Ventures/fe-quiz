@@ -48,6 +48,8 @@ class AdminSubjectActionNotifier extends Notifier<AdminSubjectActionState> {
     required String name,
     required String description,
     required int durationMinutes,
+    required DateTime publishAt,
+    required DateTime closeAt,
   }) async {
     state = state.copyWith(isCreating: true, clearError: true);
     try {
@@ -58,6 +60,8 @@ class AdminSubjectActionNotifier extends Notifier<AdminSubjectActionState> {
         durationMinutes: durationMinutes,
         attemptLimit: 1,
         allowReview: false,
+        publishAt: publishAt,
+        closeAt: closeAt,
       );
       state = state.copyWith(isCreating: false, clearError: true);
       ref.invalidate(subjectListProvider);
@@ -71,7 +75,7 @@ class AdminSubjectActionNotifier extends Notifier<AdminSubjectActionState> {
     } catch (_) {
       state = state.copyWith(
         isCreating: false,
-        errorMessage: 'Mata pelajaran belum berhasil dibuat.',
+        errorMessage: 'Ujian belum berhasil dibuat.',
       );
       return null;
     }
@@ -84,6 +88,8 @@ class AdminSubjectActionNotifier extends Notifier<AdminSubjectActionState> {
     required int durationMinutes,
     required int attemptLimit,
     required bool allowReview,
+    required DateTime publishAt,
+    required DateTime closeAt,
   }) async {
     state = state.copyWith(isUpdating: true, clearError: true);
     try {
@@ -95,6 +101,8 @@ class AdminSubjectActionNotifier extends Notifier<AdminSubjectActionState> {
         durationMinutes: durationMinutes,
         attemptLimit: attemptLimit,
         allowReview: allowReview,
+        publishAt: publishAt,
+        closeAt: closeAt,
       );
       state = state.copyWith(isUpdating: false, clearError: true);
       ref.invalidate(subjectListProvider);
@@ -108,7 +116,7 @@ class AdminSubjectActionNotifier extends Notifier<AdminSubjectActionState> {
     } catch (_) {
       state = state.copyWith(
         isUpdating: false,
-        errorMessage: 'Perubahan mata pelajaran belum berhasil disimpan.',
+        errorMessage: 'Perubahan ujian belum berhasil disimpan.',
       );
       return null;
     }
@@ -131,7 +139,7 @@ class AdminSubjectActionNotifier extends Notifier<AdminSubjectActionState> {
     } catch (_) {
       state = state.copyWith(
         isDeleting: false,
-        errorMessage: 'Mata pelajaran belum berhasil dihapus.',
+        errorMessage: 'Ujian belum berhasil dihapus.',
       );
       return false;
     }

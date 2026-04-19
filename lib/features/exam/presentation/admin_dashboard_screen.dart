@@ -82,9 +82,9 @@ class AdminDashboardScreen extends ConsumerWidget {
                     width: width,
                     child: _MetricCard(
                       icon: Icons.menu_book_rounded,
-                      title: 'Mata Pelajaran',
+                      title: 'Ujian',
                       value: '$totalSubjects',
-                      caption: 'Total materi yang siap dipakai ujian',
+                      caption: 'Total ujian yang siap dikerjakan siswa',
                     ),
                   ),
                   SizedBox(
@@ -93,7 +93,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                       icon: Icons.quiz_rounded,
                       title: 'Jumlah Soal',
                       value: '$totalQuestions',
-                      caption: 'Total soal aktif dari semua mapel',
+                      caption: 'Total soal aktif dari semua ujian',
                     ),
                   ),
                   SizedBox(

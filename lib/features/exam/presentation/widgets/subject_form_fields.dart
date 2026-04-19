@@ -8,6 +8,10 @@ class SubjectFormFields extends StatelessWidget {
     required this.nameController,
     required this.descriptionController,
     required this.durationMinutesController,
+    required this.publishAt,
+    required this.closeAt,
+    required this.onPublishAtChanged,
+    required this.onCloseAtChanged,
     super.key,
     this.showAdvancedFields = false,
     this.attemptLimitController,
@@ -18,10 +22,60 @@ class SubjectFormFields extends StatelessWidget {
   final TextEditingController nameController;
   final TextEditingController descriptionController;
   final TextEditingController durationMinutesController;
+  final DateTime? publishAt;
+  final DateTime? closeAt;
+  final ValueChanged<DateTime> onPublishAtChanged;
+  final ValueChanged<DateTime> onCloseAtChanged;
   final bool showAdvancedFields;
   final TextEditingController? attemptLimitController;
   final bool allowReview;
   final ValueChanged<bool>? onAllowReviewChanged;
+
+  Future<DateTime?> _pickDateTime({
+    required BuildContext context,
+    required DateTime? initial,
+  }) async {
+    final now = DateTime.now();
+    final base = initial ?? now;
+
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: base,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (pickedDate == null) {
+      return null;
+    }
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(base),
+    );
+    if (pickedTime == null) {
+      return null;
+    }
+
+    return DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+  }
+
+  String _formatDateTime(DateTime? value) {
+    if (value == null) {
+      return '-';
+    }
+    final local = value.toLocal();
+    final date =
+        '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+    final time =
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    return '$date $time';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,8 +86,8 @@ class SubjectFormFields extends StatelessWidget {
         TextFormField(
           controller: nameController,
           decoration: const InputDecoration(
-            labelText: 'Nama Mata Pelajaran',
-            hintText: 'Contoh: Matematika Dasar',
+            labelText: 'Nama Ujian',
+            hintText: 'Contoh: Ujian Matematika Dasar',
           ),
           textInputAction: TextInputAction.next,
           validator: _validateName,
@@ -43,7 +97,7 @@ class SubjectFormFields extends StatelessWidget {
           controller: descriptionController,
           decoration: const InputDecoration(
             labelText: 'Deskripsi',
-            hintText: 'Ringkasan materi mata pelajaran',
+            hintText: 'Ringkasan ujian',
           ),
           minLines: 2,
           maxLines: 4,
@@ -66,6 +120,51 @@ class SubjectFormFields extends StatelessWidget {
           ],
           textInputAction: TextInputAction.next,
           validator: _validateDuration,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: <Widget>[
+            SizedBox(
+              width: 280,
+              child: OutlinedButton(
+                onPressed: () async {
+                  final picked = await _pickDateTime(
+                    context: context,
+                    initial: publishAt,
+                  );
+                  if (picked != null) {
+                    onPublishAtChanged(picked);
+                  }
+                },
+                child: Text(
+                  publishAt == null
+                      ? 'Pilih Waktu Publish'
+                      : 'Publish: ${_formatDateTime(publishAt)}',
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 280,
+              child: OutlinedButton(
+                onPressed: () async {
+                  final picked = await _pickDateTime(
+                    context: context,
+                    initial: closeAt,
+                  );
+                  if (picked != null) {
+                    onCloseAtChanged(picked);
+                  }
+                },
+                child: Text(
+                  closeAt == null
+                      ? 'Pilih Waktu Close'
+                      : 'Close: ${_formatDateTime(closeAt)}',
+                ),
+              ),
+            ),
+          ],
         ),
         if (showAdvancedFields && attemptLimitController != null) ...<Widget>[
           const SizedBox(height: AppSpacing.sm),
@@ -103,13 +202,13 @@ class SubjectFormFields extends StatelessWidget {
   static String? _validateName(String? value) {
     final text = value?.trim() ?? '';
     if (text.isEmpty) {
-      return 'Nama mata pelajaran wajib diisi';
+      return 'Nama ujian wajib diisi';
     }
     if (text.length < 2) {
-      return 'Nama mata pelajaran minimal 2 karakter';
+      return 'Nama ujian minimal 2 karakter';
     }
     if (text.length > 150) {
-      return 'Nama mata pelajaran maksimal 150 karakter';
+      return 'Nama ujian maksimal 150 karakter';
     }
     return null;
   }

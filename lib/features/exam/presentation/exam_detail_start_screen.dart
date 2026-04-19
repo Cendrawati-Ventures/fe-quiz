@@ -69,18 +69,18 @@ class _ExamDetailStartScreenState extends ConsumerState<ExamDetailStartScreen> {
               data: (subjects) {
                 if (subjects.isEmpty) {
                   return const AppCard(
-                    title: 'Mata pelajaran belum tersedia',
-                    subtitle: 'Belum ada mata pelajaran yang bisa dipilih.',
+                    title: 'Ujian belum tersedia',
+                    subtitle: 'Belum ada ujian yang bisa dipilih.',
                   );
                 }
 
                 _selectedSubjectId ??= subjects.first.id;
                 return AppCard(
-                  title: 'Pilih Mata Pelajaran',
+                  title: 'Pilih Ujian',
                   child: DropdownButtonFormField<String>(
                     initialValue: _selectedSubjectId,
                     decoration: const InputDecoration(
-                      labelText: 'Mata Pelajaran',
+                      labelText: 'Ujian',
                     ),
                     items: subjects
                         .map(
@@ -100,7 +100,7 @@ class _ExamDetailStartScreenState extends ConsumerState<ExamDetailStartScreen> {
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => AppCard(
-                title: 'Gagal memuat mata pelajaran',
+                title: 'Gagal memuat ujian',
                 subtitle: error.toString(),
               ),
             ),
@@ -136,7 +136,6 @@ class _ExamDetailStartScreenState extends ConsumerState<ExamDetailStartScreen> {
                 }
 
                 await sessionNotifier.startAttempt(
-                  exam: exam,
                   subject: selectedSubject,
                 );
                 if (!context.mounted) {

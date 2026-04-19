@@ -70,17 +70,17 @@ class ApiError implements Exception {
       return 'Username atau kata sandi tidak sesuai.';
     }
     if (normalized.contains('subject name already exists')) {
-      return 'Nama mata pelajaran sudah dipakai.';
+      return 'Nama ujian sudah dipakai.';
     }
     if (normalized.contains('subject not found')) {
-      return 'Mata pelajaran tidak ditemukan.';
+      return 'Ujian tidak ditemukan.';
     }
     if (normalized.contains('attempt limit reached')) {
-      return 'Batas percobaan untuk mata pelajaran ini sudah habis.';
+      return 'Batas percobaan untuk ujian ini sudah habis.';
     }
     if (normalized.contains('maksimum 30 soal') ||
         normalized.contains('melebihi 30 soal')) {
-      return 'Jumlah soal maksimal 30 untuk satu mata pelajaran.';
+      return 'Jumlah soal maksimal 30 untuk satu ujian.';
     }
     if (normalized.contains('total weight')) {
       return 'Total poin pertanyaan melebihi batas.';
@@ -97,7 +97,9 @@ class ApiError implements Exception {
     if (normalized.contains('validation error')) {
       return 'Data yang dimasukkan belum sesuai.';
     }
-    if (normalized.contains('nama mata pelajaran sudah digunakan') ||
+    if (normalized.contains('nama ujian sudah digunakan') ||
+        normalized.contains('ujian tidak ditemukan') ||
+        normalized.contains('nama mata pelajaran sudah digunakan') ||
         normalized.contains('mata pelajaran tidak ditemukan') ||
         normalized.contains('batas percobaan') ||
         normalized.contains('jumlah soal') ||

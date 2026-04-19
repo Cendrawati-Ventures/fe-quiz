@@ -6,7 +6,15 @@ import '../../../../app/theme/colors.dart';
 import '../../../../app/theme/spacing.dart';
 import '../../../auth/state/auth_provider.dart';
 
-enum AdminSection { dashboard, classes, subjects, questions, students, results }
+enum AdminSection {
+  dashboard,
+  classes,
+  exams,
+  subjects,
+  questions,
+  students,
+  results
+}
 
 class AdminLayout extends ConsumerWidget {
   const AdminLayout({
@@ -278,7 +286,7 @@ class _AdminSidebar extends StatelessWidget {
       ),
       const _AdminMenuItem(
         section: AdminSection.subjects,
-        title: 'Mata Pelajaran',
+        title: 'Ujian',
         icon: Icons.menu_book_rounded,
         path: '/admin/subjects',
       ),

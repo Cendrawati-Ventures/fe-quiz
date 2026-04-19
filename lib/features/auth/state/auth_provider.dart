@@ -74,6 +74,10 @@ class AuthNotifier extends Notifier<AuthState> {
       if (event != AuthEvent.unauthorized) {
         return;
       }
+      ref.invalidate(examListProvider);
+      ref.invalidate(subjectListProvider);
+      ref.invalidate(myResultsProvider);
+      ref.invalidate(adminResultsProvider);
       state = const AuthState(status: AuthStatus.unauthenticated);
       Future<void>(() async {
         await ref.read(examSessionProvider.notifier).clearSession();
@@ -147,6 +151,10 @@ class AuthNotifier extends Notifier<AuthState> {
         user: session.user,
         isLoading: false,
       );
+      ref.invalidate(examListProvider);
+      ref.invalidate(subjectListProvider);
+      ref.invalidate(myResultsProvider);
+      ref.invalidate(adminResultsProvider);
     } on ApiError catch (error) {
       state = AuthState(
         status: AuthStatus.unauthenticated,
@@ -229,8 +237,26 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  Future<void> refreshProfile() async {
+    if (state.status != AuthStatus.authenticated || state.user == null) {
+      return;
+    }
+
+    try {
+      final me = await _service.me();
+      await _secureStorage.saveUser(me);
+      state = state.copyWith(user: me, clearError: true);
+    } catch (_) {
+      // Keep current profile when refresh fails.
+    }
+  }
+
   Future<void> logout() async {
     await _secureStorage.clearAuthSession();
+    ref.invalidate(examListProvider);
+    ref.invalidate(subjectListProvider);
+    ref.invalidate(myResultsProvider);
+    ref.invalidate(adminResultsProvider);
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 }

@@ -114,21 +114,16 @@ class AdminClassActionNotifier extends Notifier<AdminClassActionState> {
     }
   }
 
-  Future<AdminClassDetail?> saveAssignments({
+  Future<AdminClassDetail?> saveStudentAssignments({
     required String classId,
     required List<String> studentIds,
-    required List<String> subjectIds,
   }) async {
     state = state.copyWith(isSavingAssignments: true, clearError: true);
     try {
       final service = ref.read(classroomServiceProvider);
-      await service.replaceClassStudents(
+      final detail = await service.replaceClassStudents(
         classId: classId,
         studentIds: studentIds,
-      );
-      final detail = await service.replaceClassSubjects(
-        classId: classId,
-        subjectIds: subjectIds,
       );
       state = state.copyWith(isSavingAssignments: false, clearError: true);
       ref.invalidate(classListProvider);
@@ -144,7 +139,37 @@ class AdminClassActionNotifier extends Notifier<AdminClassActionState> {
     } catch (_) {
       state = state.copyWith(
         isSavingAssignments: false,
-        errorMessage: 'Pengaturan kelas belum berhasil disimpan.',
+        errorMessage: 'Pengaturan anggota kelas belum berhasil disimpan.',
+      );
+      return null;
+    }
+  }
+
+  Future<AdminClassDetail?> saveSubjectAssignments({
+    required String classId,
+    required List<String> subjectIds,
+  }) async {
+    state = state.copyWith(isSavingAssignments: true, clearError: true);
+    try {
+      final service = ref.read(classroomServiceProvider);
+      final detail = await service.replaceClassSubjects(
+        classId: classId,
+        subjectIds: subjectIds,
+      );
+      state = state.copyWith(isSavingAssignments: false, clearError: true);
+      ref.invalidate(classListProvider);
+      ref.invalidate(classDetailProvider(classId));
+      return detail;
+    } on ApiError catch (error) {
+      state = state.copyWith(
+        isSavingAssignments: false,
+        errorMessage: error.message,
+      );
+      return null;
+    } catch (_) {
+      state = state.copyWith(
+        isSavingAssignments: false,
+        errorMessage: 'Pengaturan akses ujian belum berhasil disimpan.',
       );
       return null;
     }

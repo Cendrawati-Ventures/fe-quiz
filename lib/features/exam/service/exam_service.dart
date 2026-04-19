@@ -95,6 +95,57 @@ class ExamService {
     }
   }
 
+  Future<ApiExam> createExam({
+    required String title,
+    required DateTime startTime,
+    required DateTime endTime,
+    String? videoProvider,
+    String? videoRoomId,
+  }) async {
+    final payload = <String, dynamic>{
+      'title': title,
+      'startTime': startTime.toUtc().toIso8601String(),
+      'endTime': endTime.toUtc().toIso8601String(),
+    };
+    if (videoProvider != null && videoProvider.trim().isNotEmpty) {
+      payload['videoProvider'] = videoProvider.trim();
+    }
+    if (videoRoomId != null && videoRoomId.trim().isNotEmpty) {
+      payload['videoRoomId'] = videoRoomId.trim();
+    }
+
+    try {
+      final response = await _dio.post<dynamic>(
+        '/exams',
+        data: payload,
+        options: _writeOptions(),
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return ApiExam.fromJson(data);
+      }
+      throw ApiError(message: 'Ujian belum berhasil dibuat.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<ApiExam> publishExam(String examId) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/exams/$examId/publish',
+        options: _writeOptions(),
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return ApiExam.fromJson(data);
+      }
+      throw ApiError(message: 'Ujian belum berhasil dipublikasikan.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
   Future<List<ApiSubject>> listSubjects() async {
     try {
       final response = await _dio.get<dynamic>(
@@ -108,7 +159,7 @@ class ExamService {
             .map(ApiSubject.fromJson)
             .toList();
       }
-      throw ApiError(message: 'Daftar mata pelajaran belum bisa dimuat.');
+      throw ApiError(message: 'Daftar ujian belum bisa dimuat.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -120,6 +171,8 @@ class ExamService {
     required int durationMinutes,
     required int attemptLimit,
     required bool allowReview,
+    required DateTime publishAt,
+    required DateTime closeAt,
   }) async {
     try {
       final response = await _dio.post<dynamic>(
@@ -130,6 +183,8 @@ class ExamService {
           'durationMinutes': durationMinutes,
           'attemptLimit': attemptLimit,
           'allowReview': allowReview,
+          'publishAt': publishAt.toUtc().toIso8601String(),
+          'closeAt': closeAt.toUtc().toIso8601String(),
         },
         options: _writeOptions(),
       );
@@ -137,7 +192,7 @@ class ExamService {
       if (data is Map<String, dynamic>) {
         return ApiSubject.fromJson(data);
       }
-      throw ApiError(message: 'Mata pelajaran belum berhasil disimpan.');
+      throw ApiError(message: 'Ujian belum berhasil disimpan.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -150,6 +205,8 @@ class ExamService {
     required int durationMinutes,
     required int attemptLimit,
     required bool allowReview,
+    required DateTime publishAt,
+    required DateTime closeAt,
   }) async {
     try {
       final response = await _dio.put<dynamic>(
@@ -160,6 +217,8 @@ class ExamService {
           'durationMinutes': durationMinutes,
           'attemptLimit': attemptLimit,
           'allowReview': allowReview,
+          'publishAt': publishAt.toUtc().toIso8601String(),
+          'closeAt': closeAt.toUtc().toIso8601String(),
         },
         options: _writeOptions(),
       );
@@ -167,8 +226,7 @@ class ExamService {
       if (data is Map<String, dynamic>) {
         return ApiSubject.fromJson(data);
       }
-      throw ApiError(
-          message: 'Perubahan mata pelajaran belum berhasil disimpan.');
+      throw ApiError(message: 'Perubahan ujian belum berhasil disimpan.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -307,13 +365,20 @@ class ExamService {
   }
 
   Future<StartAttemptResponse> startAttempt({
-    required String examId,
     required String subjectId,
+    String? examId,
   }) async {
+    final payload = <String, dynamic>{
+      'subjectId': subjectId,
+    };
+    if (examId != null && examId.trim().isNotEmpty) {
+      payload['examId'] = examId;
+    }
+
     try {
       final response = await _dio.post<dynamic>(
         '/attempts/start',
-        data: <String, dynamic>{'examId': examId, 'subjectId': subjectId},
+        data: payload,
         options: _startAttemptOptions(),
       );
       final data = response.data;

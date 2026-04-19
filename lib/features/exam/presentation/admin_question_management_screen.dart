@@ -80,6 +80,43 @@ class _AdminQuestionManagementScreenState
     return true;
   }
 
+  num _totalWeight(List<AdminQuestion> questions) {
+    return questions.fold<num>(0, (total, item) => total + item.weight);
+  }
+
+  bool _isWeightBalanced(num totalWeight) {
+    return (totalWeight - 100).abs() < 0.001;
+  }
+
+  String _weightSummary(num totalWeight) {
+    final diff = 100 - totalWeight;
+    if (_isWeightBalanced(totalWeight)) {
+      return 'Total bobot sudah pas 100.';
+    }
+    if (diff > 0) {
+      return 'Kurang ${_formatWeight(diff)} poin untuk mencapai 100.';
+    }
+    return 'Melebihi ${_formatWeight(-diff)} poin dari batas 100.';
+  }
+
+  Color _weightStatusColor(BuildContext context, num totalWeight) {
+    if (_isWeightBalanced(totalWeight)) {
+      return const Color(0xFF1B7A42);
+    }
+    if (totalWeight < 100) {
+      return const Color(0xFFD08900);
+    }
+    return Theme.of(context).colorScheme.error;
+  }
+
+  String _formatWeight(num value) {
+    final rounded = value.roundToDouble();
+    if ((value - rounded).abs() < 0.001) {
+      return rounded.toInt().toString();
+    }
+    return value.toStringAsFixed(1);
+  }
+
   Future<void> _showQuickCreateQuestionDialog(String subjectId) async {
     final created = await showDialog<AdminQuestion>(
       context: context,
@@ -94,7 +131,31 @@ class _AdminQuestionManagementScreenState
       context,
       'Pertanyaan berhasil dibuat. Lanjutkan edit detail.',
     );
-    context.push('/admin/questions/$subjectId/${created.id}/edit');
+    await _openQuestionEditor(
+      subjectId: subjectId,
+      questionId: created.id,
+    );
+  }
+
+  Future<void> _openQuestionEditor({
+    required String subjectId,
+    required String questionId,
+  }) async {
+    await context.push('/admin/questions/$subjectId/$questionId/edit');
+    if (!mounted) {
+      return;
+    }
+
+    final refreshed =
+        await ref.refresh(questionListBySubjectProvider(subjectId).future);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _displayedSubjectId = subjectId;
+      _displayedQuestions = List<AdminQuestion>.from(refreshed);
+    });
   }
 
   Future<void> _onReorder({
@@ -158,7 +219,7 @@ class _AdminQuestionManagementScreenState
 
     return AdminLayout(
       title: 'Kelola Soal',
-      subtitle: 'Atur bank soal dan urutan soal per mata pelajaran.',
+      subtitle: 'Atur bank soal dan urutan soal per ujian.',
       activeSection: AdminSection.questions,
       child: subjectsAsync.when(
         data: (subjects) {
@@ -169,13 +230,13 @@ class _AdminQuestionManagementScreenState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 const AppCard(
-                  title: 'Mata pelajaran belum tersedia',
+                  title: 'Ujian belum tersedia',
                   subtitle:
-                      'Tambahkan mata pelajaran terlebih dahulu sebelum membuat soal.',
+                      'Tambahkan ujian terlebih dahulu sebelum membuat soal.',
                 ),
                 const SizedBox(height: AppSpacing.md),
                 AppButton(
-                  label: 'Buka Kelola Mata Pelajaran',
+                  label: 'Buka Kelola Ujian',
                   onPressed: () => context.go('/admin/subjects'),
                 ),
               ],
@@ -189,11 +250,11 @@ class _AdminQuestionManagementScreenState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               AppCard(
-                title: 'Pilih Mata Pelajaran',
+                title: 'Pilih Ujian',
                 child: DropdownButtonFormField<String>(
                   initialValue: selectedSubjectId,
                   decoration: const InputDecoration(
-                    labelText: 'Mata Pelajaran',
+                    labelText: 'Ujian',
                   ),
                   items: subjects
                       .map(
@@ -228,10 +289,48 @@ class _AdminQuestionManagementScreenState
                 child: questionsAsync.when(
                   data: (questions) {
                     _syncDisplayedQuestions(selectedSubjectId, questions);
+                    final totalWeight = _totalWeight(_displayedQuestions);
+                    final weightOk = _isWeightBalanced(totalWeight);
+                    final weightColor =
+                        _weightStatusColor(context, totalWeight);
+
                     if (_displayedQuestions.isEmpty) {
-                      return const AppCard(
+                      return AppCard(
                         title: 'Soal masih kosong',
-                        subtitle: 'Belum ada soal untuk mata pelajaran ini.',
+                        subtitle: 'Belum ada soal untuk ujian ini.',
+                        child: Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: weightColor.withValues(alpha: 0.1),
+                            border: Border.all(
+                              color: weightColor.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            children: <Widget>[
+                              Icon(
+                                weightOk
+                                    ? Icons.check_circle_rounded
+                                    : Icons.warning_amber_rounded,
+                                color: weightColor,
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  'Bobot: ${_formatWeight(totalWeight)}/100. ${_weightSummary(totalWeight)}',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: weightColor,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       );
                     }
 
@@ -239,53 +338,93 @@ class _AdminQuestionManagementScreenState
                       title: 'Daftar Soal',
                       subtitle:
                           'Ketuk soal untuk ubah atau hapus. Geser untuk mengubah urutan.',
-                      child: ReorderableListView.builder(
-                        shrinkWrap: true,
-                        physics: const BouncingScrollPhysics(),
-                        itemCount: _displayedQuestions.length,
-                        onReorder: (oldIndex, newIndex) => _onReorder(
-                          oldIndex: oldIndex,
-                          newIndex: newIndex,
-                          subjectId: selectedSubjectId,
-                        ),
-                        itemBuilder: (context, index) {
-                          final question = _displayedQuestions[index];
-                          return Container(
-                            key: ValueKey<String>(question.id),
-                            margin:
-                                const EdgeInsets.only(bottom: AppSpacing.xs),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.sm),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(12),
+                              color: weightColor.withValues(alpha: 0.1),
                               border: Border.all(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .outline
-                                    .withValues(alpha: 0.35),
+                                color: weightColor.withValues(alpha: 0.35),
                               ),
                             ),
-                            child: ListTile(
-                              onTap: () => context.push(
-                                '/admin/questions/$selectedSubjectId/${question.id}/edit',
-                              ),
-                              leading: CircleAvatar(
-                                radius: 15,
-                                child: Text('${index + 1}'),
-                              ),
-                              title: Text(
-                                question.text,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                'Tipe: ${adminQuestionTypeLabel(question.type)} | Bobot: ${question.weight}',
-                              ),
-                              trailing: ReorderableDragStartListener(
-                                index: index,
-                                child: const Icon(Icons.drag_handle),
-                              ),
+                            child: Row(
+                              children: <Widget>[
+                                Icon(
+                                  weightOk
+                                      ? Icons.check_circle_rounded
+                                      : Icons.warning_amber_rounded,
+                                  color: weightColor,
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Text(
+                                    'Bobot: ${_formatWeight(totalWeight)}/100. ${_weightSummary(totalWeight)}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: weightColor,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          );
-                        },
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: _displayedQuestions.length,
+                            onReorder: (oldIndex, newIndex) => _onReorder(
+                              oldIndex: oldIndex,
+                              newIndex: newIndex,
+                              subjectId: selectedSubjectId,
+                            ),
+                            itemBuilder: (context, index) {
+                              final question = _displayedQuestions[index];
+                              return Container(
+                                key: ValueKey<String>(question.id),
+                                margin:
+                                    const EdgeInsets.only(bottom: AppSpacing.xs),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .outline
+                                        .withValues(alpha: 0.35),
+                                  ),
+                                ),
+                                child: ListTile(
+                                  onTap: () => _openQuestionEditor(
+                                    subjectId: selectedSubjectId,
+                                    questionId: question.id,
+                                  ),
+                                  leading: CircleAvatar(
+                                    radius: 15,
+                                    child: Text('${index + 1}'),
+                                  ),
+                                  title: Text(
+                                    question.text,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    'Tipe: ${adminQuestionTypeLabel(question.type)} | Bobot: ${question.weight}',
+                                  ),
+                                  trailing: ReorderableDragStartListener(
+                                    index: index,
+                                    child: const Icon(Icons.drag_handle),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -303,9 +442,8 @@ class _AdminQuestionManagementScreenState
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const AppCard(
-          title: 'Gagal memuat mata pelajaran',
-          subtitle:
-              'Data mata pelajaran belum bisa dimuat. Coba lagi sebentar.',
+          title: 'Gagal memuat ujian',
+          subtitle: 'Data ujian belum bisa dimuat. Coba lagi sebentar.',
         ),
       ),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/spacing.dart';
 import '../../../shared/components/app_button.dart';
@@ -7,9 +8,7 @@ import '../../../shared/components/app_card.dart';
 import '../../../shared/components/app_snackbar.dart';
 import '../model/classroom_models.dart';
 import '../service/classroom_service.dart';
-import '../service/student_account_service.dart';
 import '../state/admin_class_state.dart';
-import '../state/exam_state.dart';
 import 'widgets/admin_layout.dart';
 
 class AdminClassManagementScreen extends ConsumerWidget {
@@ -56,7 +55,7 @@ class AdminClassManagementScreen extends ConsumerWidget {
           title: const Text('Hapus Kelas'),
           content: Text(
             'Kelas "${classRoom.name}" akan dihapus.\n\n'
-            'Siswa di kelas ini akan dilepas dari kelas dan pengaturan akses mapel kelas ini juga hilang.',
+            'Siswa di kelas ini akan dilepas dari kelas dan pengaturan akses ujian kelas ini juga hilang.',
           ),
           actions: <Widget>[
             TextButton(
@@ -92,23 +91,13 @@ class AdminClassManagementScreen extends ConsumerWidget {
     AppSnackBar.error(context, message);
   }
 
-  Future<void> _showManageAssignmentsDialog(
-    BuildContext context, {
-    required String classId,
-  }) async {
-    await showDialog<void>(
-      context: context,
-      builder: (_) => _ClassAssignmentDialog(classId: classId),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final classesAsync = ref.watch(classListProvider);
 
     return AdminLayout(
       title: 'Kelola Kelas',
-      subtitle: 'Atur kelas, anggota siswa, dan akses mata pelajaran.',
+      subtitle: 'Atur kelas, anggota siswa, dan akses ujian.',
       activeSection: AdminSection.classes,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -136,24 +125,31 @@ class AdminClassManagementScreen extends ConsumerWidget {
                     return AppCard(
                       title: item.name,
                       subtitle:
-                          'Siswa: ${item.studentCount} orang\nAkses mata pelajaran: ${item.subjectCount} mapel',
+                          'Siswa: ${item.studentCount} orang\nAkses ujian: ${item.subjectCount} ujian',
                       child: Wrap(
                         spacing: AppSpacing.sm,
                         runSpacing: AppSpacing.sm,
                         children: <Widget>[
                           SizedBox(
-                            width: 220,
+                            width: 170,
                             child: AppButton(
-                              label: 'Atur Anggota & Akses',
+                              label: 'Atur Anggota',
                               variant: AppButtonVariant.secondary,
-                              onPressed: () => _showManageAssignmentsDialog(
-                                context,
-                                classId: item.id,
-                              ),
+                              onPressed: () =>
+                                  context.go('/admin/classes/${item.id}/students'),
                             ),
                           ),
                           SizedBox(
-                            width: 150,
+                            width: 210,
+                            child: AppButton(
+                              label: 'Atur Ujian',
+                              variant: AppButtonVariant.secondary,
+                              onPressed: () =>
+                                  context.go('/admin/classes/${item.id}/subjects'),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 140,
                             child: AppButton(
                               label: 'Ubah Nama',
                               variant: AppButtonVariant.secondary,
@@ -164,7 +160,7 @@ class AdminClassManagementScreen extends ConsumerWidget {
                             ),
                           ),
                           SizedBox(
-                            width: 120,
+                            width: 110,
                             child: AppButton(
                               label: 'Hapus',
                               variant: AppButtonVariant.danger,
@@ -374,175 +370,6 @@ class _RenameClassDialogState extends ConsumerState<_RenameClassDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Text('Simpan'),
-        ),
-      ],
-    );
-  }
-}
-
-class _ClassAssignmentDialog extends ConsumerStatefulWidget {
-  const _ClassAssignmentDialog({required this.classId});
-
-  final String classId;
-
-  @override
-  ConsumerState<_ClassAssignmentDialog> createState() =>
-      _ClassAssignmentDialogState();
-}
-
-class _ClassAssignmentDialogState extends ConsumerState<_ClassAssignmentDialog> {
-  Set<String> _selectedStudentIds = <String>{};
-  Set<String> _selectedSubjectIds = <String>{};
-  bool _initialized = false;
-
-  void _initSelection(AdminClassDetail detail) {
-    if (_initialized) {
-      return;
-    }
-
-    _selectedStudentIds = detail.studentIds.toSet();
-    _selectedSubjectIds = detail.subjectIds.toSet();
-    _initialized = true;
-  }
-
-  Future<void> _saveAssignments() async {
-    final detail = await ref.read(adminClassActionProvider.notifier).saveAssignments(
-          classId: widget.classId,
-          studentIds: _selectedStudentIds.toList(),
-          subjectIds: _selectedSubjectIds.toList(),
-        );
-
-    if (!mounted) {
-      return;
-    }
-
-    if (detail != null) {
-      AppSnackBar.success(context, 'Pengaturan kelas berhasil disimpan.');
-      Navigator.of(context).pop();
-      return;
-    }
-
-    final message = ref.read(adminClassActionProvider).errorMessage ??
-        'Pengaturan kelas belum berhasil disimpan.';
-    AppSnackBar.error(context, message);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final detailAsync = ref.watch(classDetailProvider(widget.classId));
-    final studentsAsync = ref.watch(studentAccountsProvider);
-    final subjectsAsync = ref.watch(subjectListProvider);
-    final actionState = ref.watch(adminClassActionProvider);
-
-    return AlertDialog(
-      title: const Text('Atur Anggota & Akses Mapel'),
-      content: SizedBox(
-        width: 760,
-        child: detailAsync.when(
-          data: (detail) {
-            _initSelection(detail);
-            return studentsAsync.when(
-              data: (students) {
-                return subjectsAsync.when(
-                  data: (subjects) {
-                    return SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                            'Kelas: ${detail.name}',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          const Text('Pilih siswa yang menjadi anggota kelas ini.'),
-                          const SizedBox(height: AppSpacing.xs),
-                          Container(
-                            constraints: const BoxConstraints(maxHeight: 220),
-                            child: ListView(
-                              shrinkWrap: true,
-                              children: students.map((student) {
-                                final checked = _selectedStudentIds.contains(student.id);
-                                final label = student.fullName?.trim().isNotEmpty == true
-                                    ? student.fullName!.trim()
-                                    : student.username;
-                                return CheckboxListTile(
-                                  dense: true,
-                                  value: checked,
-                                  title: Text(label),
-                                  subtitle: Text('username: ${student.username}'),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      if (value == true) {
-                                        _selectedStudentIds.add(student.id);
-                                      } else {
-                                        _selectedStudentIds.remove(student.id);
-                                      }
-                                    });
-                                  },
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          const Text('Pilih mata pelajaran yang boleh diakses kelas ini.'),
-                          const SizedBox(height: AppSpacing.xs),
-                          Container(
-                            constraints: const BoxConstraints(maxHeight: 220),
-                            child: ListView(
-                              shrinkWrap: true,
-                              children: subjects.map((subject) {
-                                final checked = _selectedSubjectIds.contains(subject.id);
-                                return CheckboxListTile(
-                                  dense: true,
-                                  value: checked,
-                                  title: Text(subject.name),
-                                  subtitle: Text(
-                                      'Durasi ${subject.durationMinutes} menit | Batas ${subject.attemptLimit}x'),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      if (value == true) {
-                                        _selectedSubjectIds.add(subject.id);
-                                      } else {
-                                        _selectedSubjectIds.remove(subject.id);
-                                      }
-                                    });
-                                  },
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (error, _) => Text(error.toString()),
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Text(error.toString()),
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Text(error.toString()),
-        ),
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: actionState.isSavingAssignments
-              ? null
-              : () => Navigator.of(context).pop(),
-          child: const Text('Tutup'),
-        ),
-        FilledButton(
-          onPressed: actionState.isSavingAssignments ? null : _saveAssignments,
-          child: actionState.isSavingAssignments
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Simpan Pengaturan'),
         ),
       ],
     );

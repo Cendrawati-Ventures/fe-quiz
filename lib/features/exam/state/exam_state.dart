@@ -528,7 +528,6 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
   }
 
   Future<void> startAttempt({
-    required ApiExam exam,
     required ApiSubject subject,
   }) async {
     state = state.copyWith(
@@ -541,14 +540,13 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
 
     try {
       final response = await _service.startAttempt(
-        examId: exam.id,
         subjectId: subject.id,
       );
 
       _timeSync.syncFromServerUtc(response.attempt.startTime.toUtc());
       state = state.copyWith(
         isLoading: false,
-        exam: exam,
+        exam: null,
         subject: subject,
         attempt: response.attempt,
         questions: response.questions,
@@ -597,9 +595,8 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       }
 
       var questions = state.questions;
-      if (questions.isEmpty && state.exam != null && state.subject != null) {
+      if (questions.isEmpty && state.subject != null) {
         final restarted = await _service.startAttempt(
-          examId: state.exam!.id,
           subjectId: state.subject!.id,
         );
         questions = restarted.questions;
@@ -992,7 +989,8 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     return message.contains('sesi ujian sudah tidak aktif') ||
         message.contains('waktu sesi ujian sudah habis') ||
         message.contains('ujian tidak tersedia pada waktu ini') ||
-        message.contains('ujian belum dipublikasikan');
+        message.contains('ujian belum dipublikasikan') ||
+        message.contains('ujian sudah ditutup');
   }
 
   String _buildDroppedQueueMessage(OutboxItem item) {
@@ -1076,16 +1074,16 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
   void _recalculateTimer() {
     final attempt = state.attempt;
     final subject = state.subject;
-    final exam = state.exam;
-    if (attempt == null || subject == null || exam == null) {
+    if (attempt == null || subject == null) {
       state = state.copyWith(remainingSeconds: 0);
       return;
     }
 
     final startedAt = attempt.startTime.toUtc();
-    final bySubject = startedAt.add(Duration(minutes: subject.durationMinutes));
-    final byExam = exam.endTime.toUtc();
-    final hardDeadline = bySubject.isBefore(byExam) ? bySubject : byExam;
+    final byDuration = startedAt.add(Duration(minutes: subject.durationMinutes));
+    final closeAt = subject.closeAt?.toUtc();
+    final hardDeadline =
+        closeAt != null && closeAt.isBefore(byDuration) ? closeAt : byDuration;
     final nowServer = DateTime.now()
         .toUtc()
         .add(Duration(milliseconds: state.serverOffsetMs));

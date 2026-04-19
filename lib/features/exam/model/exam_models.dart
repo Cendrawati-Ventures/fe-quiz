@@ -181,6 +181,8 @@ class ApiSubject {
     required this.durationMinutes,
     required this.attemptLimit,
     required this.allowReview,
+    required this.publishAt,
+    required this.closeAt,
   });
 
   final String id;
@@ -189,6 +191,8 @@ class ApiSubject {
   final int durationMinutes;
   final int attemptLimit;
   final bool allowReview;
+  final DateTime? publishAt;
+  final DateTime? closeAt;
 
   factory ApiSubject.fromJson(Map<String, dynamic> json) {
     return ApiSubject(
@@ -198,6 +202,12 @@ class ApiSubject {
       durationMinutes: json['durationMinutes'] as int,
       attemptLimit: json['attemptLimit'] as int,
       allowReview: json['allowReview'] as bool? ?? false,
+      publishAt: (json['publishAt'] as String?) == null
+          ? null
+          : DateTime.parse(json['publishAt'] as String),
+      closeAt: (json['closeAt'] as String?) == null
+          ? null
+          : DateTime.parse(json['closeAt'] as String),
     );
   }
 
@@ -209,6 +219,8 @@ class ApiSubject {
       'durationMinutes': durationMinutes,
       'attemptLimit': attemptLimit,
       'allowReview': allowReview,
+      'publishAt': publishAt?.toIso8601String(),
+      'closeAt': closeAt?.toIso8601String(),
     };
   }
 }

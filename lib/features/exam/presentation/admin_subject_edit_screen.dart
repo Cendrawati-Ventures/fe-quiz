@@ -33,6 +33,8 @@ class _AdminSubjectEditScreenState
   final TextEditingController _durationController = TextEditingController();
   final TextEditingController _attemptLimitController = TextEditingController();
   bool _allowReview = false;
+  DateTime? _publishAt;
+  DateTime? _closeAt;
   bool _initialized = false;
 
   @override
@@ -53,6 +55,8 @@ class _AdminSubjectEditScreenState
     _durationController.text = subject.durationMinutes.toString();
     _attemptLimitController.text = subject.attemptLimit.toString();
     _allowReview = subject.allowReview;
+    _publishAt = subject.publishAt?.toLocal();
+    _closeAt = subject.closeAt?.toLocal();
     _initialized = true;
   }
 
@@ -63,6 +67,16 @@ class _AdminSubjectEditScreenState
 
     final durationMinutes = int.parse(_durationController.text.trim());
     final attemptLimit = int.parse(_attemptLimitController.text.trim());
+    final publishAt = _publishAt;
+    final closeAt = _closeAt;
+    if (publishAt == null || closeAt == null) {
+      AppSnackBar.error(context, 'Waktu publish dan close ujian wajib diisi.');
+      return;
+    }
+    if (!closeAt.isAfter(publishAt)) {
+      AppSnackBar.error(context, 'Waktu close harus setelah waktu publish.');
+      return;
+    }
 
     final updated = await ref.read(adminSubjectActionProvider.notifier).update(
           id: widget.subjectId,
@@ -71,6 +85,8 @@ class _AdminSubjectEditScreenState
           durationMinutes: durationMinutes,
           attemptLimit: attemptLimit,
           allowReview: _allowReview,
+          publishAt: publishAt,
+          closeAt: closeAt,
         );
 
     if (!mounted) {
@@ -78,13 +94,13 @@ class _AdminSubjectEditScreenState
     }
 
     if (updated != null) {
-      AppSnackBar.success(context, 'Mata pelajaran berhasil diperbarui.');
+      AppSnackBar.success(context, 'Ujian berhasil diperbarui.');
       context.go('/admin/subjects');
       return;
     }
 
     final error = ref.read(adminSubjectActionProvider).errorMessage;
-    AppSnackBar.error(context, error ?? 'Gagal memperbarui mata pelajaran.');
+    AppSnackBar.error(context, error ?? 'Gagal memperbarui ujian.');
   }
 
   Future<void> _deleteSubject() async {
@@ -92,9 +108,9 @@ class _AdminSubjectEditScreenState
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Hapus Mata Pelajaran'),
+          title: const Text('Hapus Ujian'),
           content: const Text(
-            'Yakin ingin menghapus mata pelajaran ini? Tindakan ini tidak bisa dibatalkan.',
+            'Yakin ingin menghapus ujian ini? Tindakan ini tidak bisa dibatalkan.',
           ),
           actions: <Widget>[
             TextButton(
@@ -123,13 +139,13 @@ class _AdminSubjectEditScreenState
     }
 
     if (deleted) {
-      AppSnackBar.success(context, 'Mata pelajaran berhasil dihapus.');
+      AppSnackBar.success(context, 'Ujian berhasil dihapus.');
       context.go('/admin/subjects');
       return;
     }
 
     final error = ref.read(adminSubjectActionProvider).errorMessage;
-    AppSnackBar.error(context, error ?? 'Gagal menghapus mata pelajaran.');
+    AppSnackBar.error(context, error ?? 'Gagal menghapus ujian.');
   }
 
   @override
@@ -138,8 +154,8 @@ class _AdminSubjectEditScreenState
     final actionState = ref.watch(adminSubjectActionProvider);
 
     return AdminLayout(
-      title: 'Ubah Mata Pelajaran',
-      subtitle: 'Perbarui data mata pelajaran secara lengkap.',
+      title: 'Ubah Ujian',
+      subtitle: 'Perbarui data ujian secara lengkap.',
       activeSection: AdminSection.subjects,
       child: subjectsAsync.when(
         data: (subjects) {
@@ -156,13 +172,13 @@ class _AdminSubjectEditScreenState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 const AppCard(
-                  title: 'Mata pelajaran tidak ditemukan',
+                  title: 'Ujian tidak ditemukan',
                   subtitle:
-                      'Data mata pelajaran belum tersedia. Silakan kembali lalu muat ulang daftar.',
+                      'Data ujian belum tersedia. Silakan kembali lalu muat ulang daftar.',
                 ),
                 const SizedBox(height: AppSpacing.md),
                 AppButton(
-                  label: 'Kembali ke Kelola Mata Pelajaran',
+                  label: 'Kembali ke Kelola Ujian',
                   onPressed: () => context.go('/admin/subjects'),
                 ),
               ],
@@ -176,13 +192,28 @@ class _AdminSubjectEditScreenState
             child: ListView(
               children: <Widget>[
                 AppCard(
-                  title: 'Ubah Data Mata Pelajaran',
+                  title: 'Ubah Data Ujian',
                   subtitle:
-                      'Atur nama, deskripsi, durasi, batas percobaan, dan izin tinjau jawaban.',
+                      'Atur nama, deskripsi, jadwal publish-close, durasi, batas percobaan, dan izin tinjau jawaban.',
                   child: SubjectFormFields(
                     nameController: _nameController,
                     descriptionController: _descriptionController,
                     durationMinutesController: _durationController,
+                    publishAt: _publishAt,
+                    closeAt: _closeAt,
+                    onPublishAtChanged: (value) {
+                      setState(() {
+                        _publishAt = value;
+                        if (_closeAt != null && !_closeAt!.isAfter(value)) {
+                          _closeAt = value.add(const Duration(hours: 1));
+                        }
+                      });
+                    },
+                    onCloseAtChanged: (value) {
+                      setState(() {
+                        _closeAt = value;
+                      });
+                    },
                     showAdvancedFields: true,
                     attemptLimitController: _attemptLimitController,
                     allowReview: _allowReview,
@@ -202,7 +233,7 @@ class _AdminSubjectEditScreenState
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 AppButton(
-                  label: 'Hapus Mata Pelajaran',
+                  label: 'Hapus Ujian',
                   variant: AppButtonVariant.danger,
                   loading: actionState.isDeleting,
                   disabled: actionState.isUpdating,
@@ -210,7 +241,7 @@ class _AdminSubjectEditScreenState
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 AppButton(
-                  label: 'Kembali ke Kelola Mata Pelajaran',
+                  label: 'Kembali ke Kelola Ujian',
                   variant: AppButtonVariant.secondary,
                   disabled: actionState.isUpdating || actionState.isDeleting,
                   onPressed: () => context.go('/admin/subjects'),
@@ -221,9 +252,8 @@ class _AdminSubjectEditScreenState
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const AppCard(
-          title: 'Gagal memuat mata pelajaran',
-          subtitle:
-              'Data mata pelajaran belum bisa dimuat. Coba lagi sebentar.',
+          title: 'Gagal memuat ujian',
+          subtitle: 'Data ujian belum bisa dimuat. Coba lagi sebentar.',
         ),
       ),
     );

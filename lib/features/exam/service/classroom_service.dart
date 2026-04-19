@@ -130,7 +130,7 @@ class ClassroomService {
       if (data is Map<String, dynamic>) {
         return AdminClassDetail.fromJson(data);
       }
-      throw ApiError(message: 'Akses mata pelajaran kelas gagal diperbarui.');
+      throw ApiError(message: 'Akses ujian kelas gagal diperbarui.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
