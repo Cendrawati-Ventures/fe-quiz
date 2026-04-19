@@ -7,12 +7,81 @@ class ExamService {
   ExamService(this._dio);
 
   final Dio _dio;
+  static const Duration _readConnectTimeout = Duration(seconds: 10);
+  static const Duration _readSendTimeout = Duration(seconds: 10);
+  static const Duration _readReceiveTimeout = Duration(seconds: 15);
+  static const Duration _writeConnectTimeout = Duration(seconds: 10);
+  static const Duration _writeSendTimeout = Duration(seconds: 10);
+  static const Duration _writeReceiveTimeout = Duration(seconds: 15);
+  static const Duration _startAttemptConnectTimeout = Duration(seconds: 8);
+  static const Duration _startAttemptSendTimeout = Duration(seconds: 8);
+  static const Duration _startAttemptReceiveTimeout = Duration(seconds: 15);
+  static const Duration _saveAnswerConnectTimeout = Duration(seconds: 5);
+  static const Duration _saveAnswerSendTimeout = Duration(seconds: 5);
+  static const Duration _saveAnswerReceiveTimeout = Duration(seconds: 8);
+  static const Duration _proctoringConnectTimeout = Duration(seconds: 5);
+  static const Duration _proctoringSendTimeout = Duration(seconds: 5);
+  static const Duration _proctoringReceiveTimeout = Duration(seconds: 8);
+  static const Duration _submitConnectTimeout = Duration(seconds: 8);
+  static const Duration _submitSendTimeout = Duration(seconds: 8);
+  static const Duration _submitReceiveTimeout = Duration(seconds: 40);
 
   Dio get client => _dio;
 
+  Options _readOptions() {
+    return Options(
+      connectTimeout: _readConnectTimeout,
+      sendTimeout: _readSendTimeout,
+      receiveTimeout: _readReceiveTimeout,
+    );
+  }
+
+  Options _writeOptions() {
+    return Options(
+      connectTimeout: _writeConnectTimeout,
+      sendTimeout: _writeSendTimeout,
+      receiveTimeout: _writeReceiveTimeout,
+    );
+  }
+
+  Options _startAttemptOptions() {
+    return Options(
+      connectTimeout: _startAttemptConnectTimeout,
+      sendTimeout: _startAttemptSendTimeout,
+      receiveTimeout: _startAttemptReceiveTimeout,
+    );
+  }
+
+  Options _saveAnswerOptions() {
+    return Options(
+      connectTimeout: _saveAnswerConnectTimeout,
+      sendTimeout: _saveAnswerSendTimeout,
+      receiveTimeout: _saveAnswerReceiveTimeout,
+    );
+  }
+
+  Options _proctoringOptions() {
+    return Options(
+      connectTimeout: _proctoringConnectTimeout,
+      sendTimeout: _proctoringSendTimeout,
+      receiveTimeout: _proctoringReceiveTimeout,
+    );
+  }
+
+  Options _submitOptions() {
+    return Options(
+      connectTimeout: _submitConnectTimeout,
+      sendTimeout: _submitSendTimeout,
+      receiveTimeout: _submitReceiveTimeout,
+    );
+  }
+
   Future<List<ApiExam>> listExams() async {
     try {
-      final response = await _dio.get<dynamic>('/exams');
+      final response = await _dio.get<dynamic>(
+        '/exams',
+        options: _readOptions(),
+      );
       final data = response.data;
       if (data is List<dynamic>) {
         return data
@@ -28,7 +97,10 @@ class ExamService {
 
   Future<List<ApiSubject>> listSubjects() async {
     try {
-      final response = await _dio.get<dynamic>('/api/subjects');
+      final response = await _dio.get<dynamic>(
+        '/api/subjects',
+        options: _readOptions(),
+      );
       final data = response.data;
       if (data is List<dynamic>) {
         return data
@@ -36,7 +108,7 @@ class ExamService {
             .map(ApiSubject.fromJson)
             .toList();
       }
-      throw ApiError(message: 'Daftar subject belum bisa dimuat.');
+      throw ApiError(message: 'Daftar mata pelajaran belum bisa dimuat.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -59,12 +131,13 @@ class ExamService {
           'attemptLimit': attemptLimit,
           'allowReview': allowReview,
         },
+        options: _writeOptions(),
       );
       final data = response.data;
       if (data is Map<String, dynamic>) {
         return ApiSubject.fromJson(data);
       }
-      throw ApiError(message: 'Subject belum berhasil disimpan.');
+      throw ApiError(message: 'Mata pelajaran belum berhasil disimpan.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -88,12 +161,14 @@ class ExamService {
           'attemptLimit': attemptLimit,
           'allowReview': allowReview,
         },
+        options: _writeOptions(),
       );
       final data = response.data;
       if (data is Map<String, dynamic>) {
         return ApiSubject.fromJson(data);
       }
-      throw ApiError(message: 'Perubahan subject belum berhasil disimpan.');
+      throw ApiError(
+          message: 'Perubahan mata pelajaran belum berhasil disimpan.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -101,7 +176,10 @@ class ExamService {
 
   Future<void> deleteSubject(String id) async {
     try {
-      await _dio.delete<dynamic>('/api/subjects/$id');
+      await _dio.delete<dynamic>(
+        '/api/subjects/$id',
+        options: _writeOptions(),
+      );
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -109,7 +187,10 @@ class ExamService {
 
   Future<List<AdminQuestion>> listQuestionsBySubject(String subjectId) async {
     try {
-      final response = await _dio.get<dynamic>('/api/subjects/$subjectId/questions');
+      final response = await _dio.get<dynamic>(
+        '/api/subjects/$subjectId/questions',
+        options: _readOptions(),
+      );
       final data = response.data;
       if (data is List<dynamic>) {
         return data
@@ -141,6 +222,7 @@ class ExamService {
           'correctAnswer': correctAnswer,
           'weight': weight,
         },
+        options: _writeOptions(),
       );
       final data = response.data;
       if (data is Map<String, dynamic>) {
@@ -169,6 +251,7 @@ class ExamService {
           'correctAnswer': correctAnswer,
           'weight': weight,
         },
+        options: _writeOptions(),
       );
       final data = response.data;
       if (data is Map<String, dynamic>) {
@@ -182,7 +265,10 @@ class ExamService {
 
   Future<void> deleteQuestion(String id) async {
     try {
-      await _dio.delete<dynamic>('/api/questions/$id');
+      await _dio.delete<dynamic>(
+        '/api/questions/$id',
+        options: _writeOptions(),
+      );
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -199,6 +285,7 @@ class ExamService {
           'subjectId': subjectId,
           'orderedQuestionIds': orderedQuestionIds,
         },
+        options: _writeOptions(),
       );
       final data = response.data;
       if (data is List<dynamic>) {
@@ -221,6 +308,7 @@ class ExamService {
       final response = await _dio.post<dynamic>(
         '/attempts/start',
         data: <String, dynamic>{'examId': examId, 'subjectId': subjectId},
+        options: _startAttemptOptions(),
       );
       final data = response.data;
       if (data is Map<String, dynamic>) {
@@ -234,7 +322,10 @@ class ExamService {
 
   Future<AttemptDetail> getAttemptById(String attemptId) async {
     try {
-      final response = await _dio.get<dynamic>('/attempts/$attemptId');
+      final response = await _dio.get<dynamic>(
+        '/attempts/$attemptId',
+        options: _readOptions(),
+      );
       final data = response.data;
       if (data is Map<String, dynamic>) {
         return AttemptDetail.fromJson(data);
@@ -258,6 +349,7 @@ class ExamService {
           'questionId': questionId,
           'answer': answer,
         },
+        options: _saveAnswerOptions(),
       );
       final data = response.data;
       if (data is Map<String, dynamic>) {
@@ -282,6 +374,7 @@ class ExamService {
         data: <String, dynamic>{
           'events': events.map((event) => event.toJson()).toList(),
         },
+        options: _proctoringOptions(),
       );
       final data = response.data;
       if (data is Map<String, dynamic>) {
@@ -295,7 +388,10 @@ class ExamService {
 
   Future<SubmitResponse> submitExam(String attemptId) async {
     try {
-      final response = await _dio.post<dynamic>('/attempts/$attemptId/submit');
+      final response = await _dio.post<dynamic>(
+        '/attempts/$attemptId/submit',
+        options: _submitOptions(),
+      );
       final data = response.data;
       if (data is Map<String, dynamic>) {
         return SubmitResponse.fromJson(data);
@@ -308,7 +404,10 @@ class ExamService {
 
   Future<List<ResultResponse>> getMyResults() async {
     try {
-      final response = await _dio.get<dynamic>('/results/me');
+      final response = await _dio.get<dynamic>(
+        '/results/me',
+        options: _readOptions(),
+      );
       final data = response.data;
       if (data is List<dynamic>) {
         return data
@@ -324,7 +423,10 @@ class ExamService {
 
   Future<List<ResultResponse>> getAdminResults() async {
     try {
-      final response = await _dio.get<dynamic>('/results/admin');
+      final response = await _dio.get<dynamic>(
+        '/results/admin',
+        options: _readOptions(),
+      );
       final data = response.data;
       if (data is List<dynamic>) {
         return data

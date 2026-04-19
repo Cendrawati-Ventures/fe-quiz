@@ -184,7 +184,8 @@ class OutboxQueue {
 
     final nowMs = DateTime.now().toUtc().millisecondsSinceEpoch;
     final retryCount = currentItem.retryCount + 1;
-    if (retryCount > maxRetryLimit) {
+    final isSubmitItem = currentItem.type == OutboxItemType.submit;
+    if (!isSubmitItem && retryCount > maxRetryLimit) {
       await _localDb.deleteOutboxRowById(itemId);
       return OutboxFailureAction.dropped;
     }

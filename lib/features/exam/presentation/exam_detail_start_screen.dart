@@ -69,17 +69,19 @@ class _ExamDetailStartScreenState extends ConsumerState<ExamDetailStartScreen> {
               data: (subjects) {
                 if (subjects.isEmpty) {
                   return const AppCard(
-                    title: 'Subject kosong',
-                    subtitle: 'Belum ada subject yang bisa dipilih.',
+                    title: 'Mata pelajaran belum tersedia',
+                    subtitle: 'Belum ada mata pelajaran yang bisa dipilih.',
                   );
                 }
 
                 _selectedSubjectId ??= subjects.first.id;
                 return AppCard(
-                  title: 'Pilih Subject',
+                  title: 'Pilih Mata Pelajaran',
                   child: DropdownButtonFormField<String>(
                     initialValue: _selectedSubjectId,
-                    decoration: const InputDecoration(labelText: 'Subject'),
+                    decoration: const InputDecoration(
+                      labelText: 'Mata Pelajaran',
+                    ),
                     items: subjects
                         .map(
                           (subject) => DropdownMenuItem<String>(
@@ -98,7 +100,7 @@ class _ExamDetailStartScreenState extends ConsumerState<ExamDetailStartScreen> {
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => AppCard(
-                title: 'Gagal memuat subject',
+                title: 'Gagal memuat mata pelajaran',
                 subtitle: error.toString(),
               ),
             ),
@@ -111,7 +113,7 @@ class _ExamDetailStartScreenState extends ConsumerState<ExamDetailStartScreen> {
             ],
             const SizedBox(height: AppSpacing.lg),
             AppButton(
-              label: 'Start Attempt',
+              label: 'Mulai Ujian',
               loading: sessionState.isLoading,
               disabled: exam == null ||
                   _selectedSubjectId == null ||

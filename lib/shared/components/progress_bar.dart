@@ -22,7 +22,7 @@ class ProgressBar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          'Progress $current/$total',
+          'Kemajuan $current/$total',
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
                 color: scheme.primary,
                 fontWeight: FontWeight.w700,

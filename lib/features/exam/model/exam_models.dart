@@ -88,6 +88,17 @@ String riskLevelToString(RiskLevel value) {
   }
 }
 
+String riskLevelLabel(RiskLevel value) {
+  switch (value) {
+    case RiskLevel.safe:
+      return 'Aman';
+    case RiskLevel.suspicious:
+      return 'Perlu Perhatian';
+    case RiskLevel.highRisk:
+      return 'Risiko Tinggi';
+  }
+}
+
 enum ProctoringEventType { tabSwitch, appBackground, idle, noise }
 
 ProctoringEventType proctoringEventTypeFromString(String value) {
@@ -300,9 +311,10 @@ class AdminQuestion {
       type: questionTypeFromString(json['type'] as String? ?? 'single'),
       text: (json['text'] as String? ?? '').trim(),
       options: options,
-      correctAnswer: rawCorrectAnswer is String && rawCorrectAnswer.trim().isNotEmpty
-          ? rawCorrectAnswer
-          : fallbackCorrectAnswer,
+      correctAnswer:
+          rawCorrectAnswer is String && rawCorrectAnswer.trim().isNotEmpty
+              ? rawCorrectAnswer
+              : fallbackCorrectAnswer,
       weight: _readNum(json['weight']),
       orderIndex: _readNum(json['orderIndex']).toInt(),
     );

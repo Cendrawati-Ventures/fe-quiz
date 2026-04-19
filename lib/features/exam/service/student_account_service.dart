@@ -32,7 +32,7 @@ class StudentAccountService {
             .map(StudentAccount.fromJson)
             .toList();
       }
-      throw ApiError(message: "Student list response is invalid");
+      throw ApiError(message: "Respons daftar siswa tidak valid.");
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }
@@ -54,7 +54,7 @@ class StudentAccountService {
       if (data is Map<String, dynamic>) {
         return StudentAccount.fromJson(data);
       }
-      throw ApiError(message: "Create student response is invalid");
+      throw ApiError(message: "Respons pembuatan akun siswa tidak valid.");
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }

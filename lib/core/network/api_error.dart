@@ -46,13 +46,15 @@ class ApiError implements Exception {
           statusCode: statusCode,
         );
       case DioExceptionType.cancel:
-        return ApiError(message: 'Permintaan dibatalkan.', statusCode: statusCode);
+        return ApiError(
+            message: 'Permintaan dibatalkan.', statusCode: statusCode);
       case DioExceptionType.badResponse:
       case DioExceptionType.unknown:
         break;
     }
 
-    return ApiError(message: _fallbackByStatus(statusCode), statusCode: statusCode);
+    return ApiError(
+        message: _fallbackByStatus(statusCode), statusCode: statusCode);
   }
 
   static String _friendlyFromServer(
@@ -65,19 +67,20 @@ class ApiError implements Exception {
     }
 
     if (normalized.contains('invalid username or password')) {
-      return 'Username atau password tidak sesuai.';
+      return 'Username atau kata sandi tidak sesuai.';
     }
     if (normalized.contains('subject name already exists')) {
-      return 'Nama subject sudah dipakai.';
+      return 'Nama mata pelajaran sudah dipakai.';
     }
     if (normalized.contains('subject not found')) {
-      return 'Subject tidak ditemukan.';
+      return 'Mata pelajaran tidak ditemukan.';
     }
     if (normalized.contains('attempt limit reached')) {
-      return 'Batas percobaan untuk subject ini sudah habis.';
+      return 'Batas percobaan untuk mata pelajaran ini sudah habis.';
     }
-    if (normalized.contains('maksimum 30 soal')) {
-      return 'Jumlah pertanyaan maksimal 30 untuk satu subject.';
+    if (normalized.contains('maksimum 30 soal') ||
+        normalized.contains('melebihi 30 soal')) {
+      return 'Jumlah soal maksimal 30 untuk satu mata pelajaran.';
     }
     if (normalized.contains('total weight')) {
       return 'Total poin pertanyaan melebihi batas.';
@@ -94,9 +97,26 @@ class ApiError implements Exception {
     if (normalized.contains('validation error')) {
       return 'Data yang dimasukkan belum sesuai.';
     }
+    if (normalized.contains('nama mata pelajaran sudah digunakan') ||
+        normalized.contains('mata pelajaran tidak ditemukan') ||
+        normalized.contains('batas percobaan') ||
+        normalized.contains('jumlah soal') ||
+        normalized.contains('urutan soal') ||
+        normalized.contains('jawaban') ||
+        normalized.contains('kata sandi') ||
+        normalized.contains('username')) {
+      return message.trim();
+    }
+    if (normalized.contains('invalid token') ||
+        normalized.contains('jwt') ||
+        normalized.contains('token tidak valid')) {
+      return 'Sesi kamu sudah berakhir. Silakan login lagi.';
+    }
     if (normalized.contains('unauthorized') ||
-        normalized.contains('invalid token') ||
-        normalized.contains('jwt')) {
+        normalized.contains('akses ditolak')) {
+      if (statusCode == 403) {
+        return 'Kamu tidak punya izin untuk melakukan aksi ini.';
+      }
       return 'Sesi kamu sudah berakhir. Silakan login lagi.';
     }
     if (normalized.contains('route not found') || normalized == 'not found') {
@@ -106,7 +126,12 @@ class ApiError implements Exception {
       return 'Terjadi gangguan pada sistem. Coba lagi beberapa saat.';
     }
 
-    return _fallbackByStatus(statusCode);
+    if (statusCode != null && statusCode >= 500) {
+      return _fallbackByStatus(statusCode);
+    }
+    return message.trim().isEmpty
+        ? _fallbackByStatus(statusCode)
+        : message.trim();
   }
 
   static String _fallbackByStatus(int? statusCode) {

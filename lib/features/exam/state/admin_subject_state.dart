@@ -35,8 +35,8 @@ class AdminSubjectActionState {
 
 final adminSubjectActionProvider =
     NotifierProvider<AdminSubjectActionNotifier, AdminSubjectActionState>(
-      AdminSubjectActionNotifier.new,
-    );
+  AdminSubjectActionNotifier.new,
+);
 
 class AdminSubjectActionNotifier extends Notifier<AdminSubjectActionState> {
   @override
@@ -71,7 +71,7 @@ class AdminSubjectActionNotifier extends Notifier<AdminSubjectActionState> {
     } catch (_) {
       state = state.copyWith(
         isCreating: false,
-        errorMessage: 'Subject belum berhasil dibuat.',
+        errorMessage: 'Mata pelajaran belum berhasil dibuat.',
       );
       return null;
     }
@@ -108,7 +108,7 @@ class AdminSubjectActionNotifier extends Notifier<AdminSubjectActionState> {
     } catch (_) {
       state = state.copyWith(
         isUpdating: false,
-        errorMessage: 'Perubahan subject belum berhasil disimpan.',
+        errorMessage: 'Perubahan mata pelajaran belum berhasil disimpan.',
       );
       return null;
     }
@@ -131,7 +131,7 @@ class AdminSubjectActionNotifier extends Notifier<AdminSubjectActionState> {
     } catch (_) {
       state = state.copyWith(
         isDeleting: false,
-        errorMessage: 'Subject belum berhasil dihapus.',
+        errorMessage: 'Mata pelajaran belum berhasil dihapus.',
       );
       return false;
     }

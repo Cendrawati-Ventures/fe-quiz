@@ -9,6 +9,7 @@ import '../../../shared/components/app_snackbar.dart';
 import '../model/exam_models.dart';
 import '../state/admin_subject_state.dart';
 import '../state/exam_state.dart';
+import 'widgets/admin_layout.dart';
 import 'widgets/subject_form_fields.dart';
 
 class AdminSubjectEditScreen extends ConsumerStatefulWidget {
@@ -24,7 +25,8 @@ class AdminSubjectEditScreen extends ConsumerStatefulWidget {
       _AdminSubjectEditScreenState();
 }
 
-class _AdminSubjectEditScreenState extends ConsumerState<AdminSubjectEditScreen> {
+class _AdminSubjectEditScreenState
+    extends ConsumerState<AdminSubjectEditScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
@@ -76,13 +78,13 @@ class _AdminSubjectEditScreenState extends ConsumerState<AdminSubjectEditScreen>
     }
 
     if (updated != null) {
-      AppSnackBar.success(context, 'Subject berhasil diperbarui');
+      AppSnackBar.success(context, 'Mata pelajaran berhasil diperbarui.');
       context.go('/admin/subjects');
       return;
     }
 
     final error = ref.read(adminSubjectActionProvider).errorMessage;
-    AppSnackBar.error(context, error ?? 'Gagal memperbarui subject');
+    AppSnackBar.error(context, error ?? 'Gagal memperbarui mata pelajaran.');
   }
 
   Future<void> _deleteSubject() async {
@@ -90,9 +92,9 @@ class _AdminSubjectEditScreenState extends ConsumerState<AdminSubjectEditScreen>
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Hapus Subject'),
+          title: const Text('Hapus Mata Pelajaran'),
           content: const Text(
-            'Yakin ingin menghapus subject ini? Tindakan ini tidak bisa dibatalkan.',
+            'Yakin ingin menghapus mata pelajaran ini? Tindakan ini tidak bisa dibatalkan.',
           ),
           actions: <Widget>[
             TextButton(
@@ -112,21 +114,22 @@ class _AdminSubjectEditScreenState extends ConsumerState<AdminSubjectEditScreen>
       return;
     }
 
-    final deleted =
-        await ref.read(adminSubjectActionProvider.notifier).delete(widget.subjectId);
+    final deleted = await ref
+        .read(adminSubjectActionProvider.notifier)
+        .delete(widget.subjectId);
 
     if (!mounted) {
       return;
     }
 
     if (deleted) {
-      AppSnackBar.success(context, 'Subject berhasil dihapus');
+      AppSnackBar.success(context, 'Mata pelajaran berhasil dihapus.');
       context.go('/admin/subjects');
       return;
     }
 
     final error = ref.read(adminSubjectActionProvider).errorMessage;
-    AppSnackBar.error(context, error ?? 'Gagal menghapus subject');
+    AppSnackBar.error(context, error ?? 'Gagal menghapus mata pelajaran.');
   }
 
   @override
@@ -134,93 +137,93 @@ class _AdminSubjectEditScreenState extends ConsumerState<AdminSubjectEditScreen>
     final subjectsAsync = ref.watch(subjectListProvider);
     final actionState = ref.watch(adminSubjectActionProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Edit Subject')),
-      body: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: subjectsAsync.when(
-          data: (subjects) {
-            ApiSubject? subject;
-            for (final item in subjects) {
-              if (item.id == widget.subjectId) {
-                subject = item;
-                break;
-              }
+    return AdminLayout(
+      title: 'Ubah Mata Pelajaran',
+      subtitle: 'Perbarui data mata pelajaran secara lengkap.',
+      activeSection: AdminSection.subjects,
+      child: subjectsAsync.when(
+        data: (subjects) {
+          ApiSubject? subject;
+          for (final item in subjects) {
+            if (item.id == widget.subjectId) {
+              subject = item;
+              break;
             }
+          }
 
-            if (subject == null) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  const AppCard(
-                    title: 'Subject tidak ditemukan',
-                    subtitle:
-                        'Data subject belum tersedia. Silakan kembali dan refresh daftar.',
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  AppButton(
-                    label: 'Kembali ke Subject Management',
-                    onPressed: () => context.go('/admin/subjects'),
-                  ),
-                ],
-              );
-            }
-
-            _initForm(subject);
-
-            return Form(
-              key: _formKey,
-              child: ListView(
-                children: <Widget>[
-                  AppCard(
-                    title: 'Edit Subject Lengkap',
-                    subtitle:
-                        'Kelola semua properti subject: nama, deskripsi, durasi, attempt limit, dan review.',
-                    child: SubjectFormFields(
-                      nameController: _nameController,
-                      descriptionController: _descriptionController,
-                      durationMinutesController: _durationController,
-                      showAdvancedFields: true,
-                      attemptLimitController: _attemptLimitController,
-                      allowReview: _allowReview,
-                      onAllowReviewChanged: (value) {
-                        setState(() {
-                          _allowReview = value;
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  AppButton(
-                    label: 'Simpan Perubahan',
-                    loading: actionState.isUpdating,
-                    disabled: actionState.isDeleting,
-                    onPressed: _save,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  AppButton(
-                    label: 'Hapus Subject',
-                    variant: AppButtonVariant.danger,
-                    loading: actionState.isDeleting,
-                    disabled: actionState.isUpdating,
-                    onPressed: _deleteSubject,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  AppButton(
-                    label: 'Kembali ke Subject Management',
-                    variant: AppButtonVariant.secondary,
-                    disabled: actionState.isUpdating || actionState.isDeleting,
-                    onPressed: () => context.go('/admin/subjects'),
-                  ),
-                ],
-              ),
+          if (subject == null) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const AppCard(
+                  title: 'Mata pelajaran tidak ditemukan',
+                  subtitle:
+                      'Data mata pelajaran belum tersedia. Silakan kembali lalu muat ulang daftar.',
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppButton(
+                  label: 'Kembali ke Kelola Mata Pelajaran',
+                  onPressed: () => context.go('/admin/subjects'),
+                ),
+              ],
             );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const AppCard(
-            title: 'Gagal memuat subject',
-            subtitle: 'Data subject belum bisa dimuat. Coba lagi sebentar.',
-          ),
+          }
+
+          _initForm(subject);
+
+          return Form(
+            key: _formKey,
+            child: ListView(
+              children: <Widget>[
+                AppCard(
+                  title: 'Ubah Data Mata Pelajaran',
+                  subtitle:
+                      'Atur nama, deskripsi, durasi, batas percobaan, dan izin tinjau jawaban.',
+                  child: SubjectFormFields(
+                    nameController: _nameController,
+                    descriptionController: _descriptionController,
+                    durationMinutesController: _durationController,
+                    showAdvancedFields: true,
+                    attemptLimitController: _attemptLimitController,
+                    allowReview: _allowReview,
+                    onAllowReviewChanged: (value) {
+                      setState(() {
+                        _allowReview = value;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppButton(
+                  label: 'Simpan Perubahan',
+                  loading: actionState.isUpdating,
+                  disabled: actionState.isDeleting,
+                  onPressed: _save,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                AppButton(
+                  label: 'Hapus Mata Pelajaran',
+                  variant: AppButtonVariant.danger,
+                  loading: actionState.isDeleting,
+                  disabled: actionState.isUpdating,
+                  onPressed: _deleteSubject,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                AppButton(
+                  label: 'Kembali ke Kelola Mata Pelajaran',
+                  variant: AppButtonVariant.secondary,
+                  disabled: actionState.isUpdating || actionState.isDeleting,
+                  onPressed: () => context.go('/admin/subjects'),
+                ),
+              ],
+            ),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => const AppCard(
+          title: 'Gagal memuat mata pelajaran',
+          subtitle:
+              'Data mata pelajaran belum bisa dimuat. Coba lagi sebentar.',
         ),
       ),
     );

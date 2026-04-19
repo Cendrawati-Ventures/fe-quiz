@@ -10,6 +10,7 @@ import '../../../shared/components/app_snackbar.dart';
 import '../model/exam_models.dart';
 import '../state/admin_question_state.dart';
 import '../state/exam_state.dart';
+import 'widgets/admin_layout.dart';
 import 'widgets/question_form_fields.dart';
 
 class AdminQuestionManagementScreen extends ConsumerStatefulWidget {
@@ -116,10 +117,11 @@ class _AdminQuestionManagementScreenState
     });
 
     final orderedIds = _displayedQuestions.map((item) => item.id).toList();
-    final reordered = await ref.read(adminQuestionActionProvider.notifier).reorder(
-          subjectId: subjectId,
-          orderedQuestionIds: orderedIds,
-        );
+    final reordered =
+        await ref.read(adminQuestionActionProvider.notifier).reorder(
+              subjectId: subjectId,
+              orderedQuestionIds: orderedIds,
+            );
 
     if (!mounted) {
       return;
@@ -134,9 +136,11 @@ class _AdminQuestionManagementScreenState
     }
 
     final error = ref.read(adminQuestionActionProvider).errorMessage;
-    AppSnackBar.error(context, error ?? 'Urutan pertanyaan belum berhasil disimpan.');
+    AppSnackBar.error(
+        context, error ?? 'Urutan pertanyaan belum berhasil disimpan.');
 
-    final refreshed = await ref.refresh(questionListBySubjectProvider(subjectId).future);
+    final refreshed =
+        await ref.refresh(questionListBySubjectProvider(subjectId).future);
     if (!mounted) {
       return;
     }
@@ -150,159 +154,156 @@ class _AdminQuestionManagementScreenState
     final subjectsAsync = ref.watch(subjectListProvider);
     final actionState = ref.watch(adminQuestionActionProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Question Management')),
-      body: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: subjectsAsync.when(
-          data: (subjects) {
-            _syncSelectedSubject(subjects);
-            final selectedSubjectId = _selectedSubjectId;
-            if (selectedSubjectId == null) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  const AppCard(
-                    title: 'Subject belum tersedia',
-                    subtitle:
-                        'Tambahkan subject terlebih dahulu sebelum membuat pertanyaan.',
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  AppButton(
-                    label: 'Buka Subject Management',
-                    onPressed: () => context.go('/admin/subjects'),
-                  ),
-                ],
-              );
-            }
-
-            final questionsAsync =
-                ref.watch(questionListBySubjectProvider(selectedSubjectId));
-
+    return AdminLayout(
+      title: 'Kelola Soal',
+      subtitle: 'Atur bank soal dan urutan soal per mata pelajaran.',
+      activeSection: AdminSection.questions,
+      child: subjectsAsync.when(
+        data: (subjects) {
+          _syncSelectedSubject(subjects);
+          final selectedSubjectId = _selectedSubjectId;
+          if (selectedSubjectId == null) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                AppCard(
-                  title: 'Pilih Subject',
-                  child: DropdownButtonFormField<String>(
-                    initialValue: selectedSubjectId,
-                    decoration: const InputDecoration(
-                      labelText: 'Subject',
-                    ),
-                    items: subjects
-                        .map(
-                          (subject) => DropdownMenuItem<String>(
-                            value: subject.id,
-                            child: Text(subject.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value == null) {
-                        return;
-                      }
-                      setState(() {
-                        _selectedSubjectId = value;
-                      });
-                    },
-                  ),
+                const AppCard(
+                  title: 'Mata pelajaran belum tersedia',
+                  subtitle:
+                      'Tambahkan mata pelajaran terlebih dahulu sebelum membuat soal.',
                 ),
                 const SizedBox(height: AppSpacing.md),
                 AppButton(
-                  label: 'Quick Create Question',
-                  loading: actionState.isCreating,
-                  disabled: actionState.isUpdating ||
-                      actionState.isDeleting ||
-                      actionState.isReordering,
-                  onPressed: () => _showQuickCreateQuestionDialog(selectedSubjectId),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Expanded(
-                  child: questionsAsync.when(
-                    data: (questions) {
-                      _syncDisplayedQuestions(selectedSubjectId, questions);
-                      if (_displayedQuestions.isEmpty) {
-                        return const AppCard(
-                          title: 'Pertanyaan kosong',
-                          subtitle: 'Belum ada pertanyaan untuk subject ini.',
-                        );
-                      }
-
-                      return AppCard(
-                        title: 'Daftar Pertanyaan',
-                        subtitle:
-                            'Tap pertanyaan untuk edit atau hapus. Drag untuk mengubah urutan.',
-                        child: ReorderableListView.builder(
-                          shrinkWrap: true,
-                          physics: const BouncingScrollPhysics(),
-                          itemCount: _displayedQuestions.length,
-                          onReorder: (oldIndex, newIndex) => _onReorder(
-                            oldIndex: oldIndex,
-                            newIndex: newIndex,
-                            subjectId: selectedSubjectId,
-                          ),
-                          itemBuilder: (context, index) {
-                            final question = _displayedQuestions[index];
-                            return Container(
-                              key: ValueKey<String>(question.id),
-                              margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .outline
-                                      .withValues(alpha: 0.35),
-                                ),
-                              ),
-                              child: ListTile(
-                                onTap: () => context.push(
-                                  '/admin/questions/$selectedSubjectId/${question.id}/edit',
-                                ),
-                                leading: CircleAvatar(
-                                  radius: 15,
-                                  child: Text('${index + 1}'),
-                                ),
-                                title: Text(
-                                  question.text,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                subtitle: Text(
-                                  'Poin: ${question.weight} • Jawaban: ${question.correctAnswer}',
-                                ),
-                                trailing: ReorderableDragStartListener(
-                                  index: index,
-                                  child: const Icon(Icons.drag_handle),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    },
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (_, __) => const AppCard(
-                      title: 'Gagal memuat pertanyaan',
-                      subtitle:
-                          'Daftar pertanyaan belum bisa dimuat. Coba lagi sebentar.',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                AppButton(
-                  label: 'Kembali ke Dashboard',
-                  variant: AppButtonVariant.secondary,
-                  onPressed: () => context.go('/admin/dashboard'),
+                  label: 'Buka Kelola Mata Pelajaran',
+                  onPressed: () => context.go('/admin/subjects'),
                 ),
               ],
             );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const AppCard(
-            title: 'Gagal memuat subject',
-            subtitle: 'Data subject belum bisa dimuat. Coba lagi sebentar.',
-          ),
+          }
+
+          final questionsAsync =
+              ref.watch(questionListBySubjectProvider(selectedSubjectId));
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              AppCard(
+                title: 'Pilih Mata Pelajaran',
+                child: DropdownButtonFormField<String>(
+                  initialValue: selectedSubjectId,
+                  decoration: const InputDecoration(
+                    labelText: 'Mata Pelajaran',
+                  ),
+                  items: subjects
+                      .map(
+                        (subject) => DropdownMenuItem<String>(
+                          value: subject.id,
+                          child: Text(subject.name),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+                    setState(() {
+                      _selectedSubjectId = value;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              AppButton(
+                label: 'Buat Soal Cepat',
+                loading: actionState.isCreating,
+                disabled: actionState.isUpdating ||
+                    actionState.isDeleting ||
+                    actionState.isReordering,
+                onPressed: () =>
+                    _showQuickCreateQuestionDialog(selectedSubjectId),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Expanded(
+                child: questionsAsync.when(
+                  data: (questions) {
+                    _syncDisplayedQuestions(selectedSubjectId, questions);
+                    if (_displayedQuestions.isEmpty) {
+                      return const AppCard(
+                        title: 'Soal masih kosong',
+                        subtitle: 'Belum ada soal untuk mata pelajaran ini.',
+                      );
+                    }
+
+                    return AppCard(
+                      title: 'Daftar Soal',
+                      subtitle:
+                          'Ketuk soal untuk ubah atau hapus. Geser untuk mengubah urutan.',
+                      child: ReorderableListView.builder(
+                        shrinkWrap: true,
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: _displayedQuestions.length,
+                        onReorder: (oldIndex, newIndex) => _onReorder(
+                          oldIndex: oldIndex,
+                          newIndex: newIndex,
+                          subjectId: selectedSubjectId,
+                        ),
+                        itemBuilder: (context, index) {
+                          final question = _displayedQuestions[index];
+                          return Container(
+                            key: ValueKey<String>(question.id),
+                            margin:
+                                const EdgeInsets.only(bottom: AppSpacing.xs),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outline
+                                    .withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: ListTile(
+                              onTap: () => context.push(
+                                '/admin/questions/$selectedSubjectId/${question.id}/edit',
+                              ),
+                              leading: CircleAvatar(
+                                radius: 15,
+                                child: Text('${index + 1}'),
+                              ),
+                              title: Text(
+                                question.text,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                'Poin: ${question.weight} | Jawaban Benar: ${question.correctAnswer}',
+                              ),
+                              trailing: ReorderableDragStartListener(
+                                index: index,
+                                child: const Icon(Icons.drag_handle),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (_, __) => const AppCard(
+                    title: 'Gagal memuat pertanyaan',
+                    subtitle:
+                        'Daftar pertanyaan belum bisa dimuat. Coba lagi sebentar.',
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => const AppCard(
+          title: 'Gagal memuat mata pelajaran',
+          subtitle:
+              'Data mata pelajaran belum bisa dimuat. Coba lagi sebentar.',
         ),
       ),
     );
@@ -325,7 +326,8 @@ class _QuickCreateQuestionDialogState
     extends ConsumerState<_QuickCreateQuestionDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _questionController = TextEditingController();
-  final TextEditingController _weightController = TextEditingController(text: '10');
+  final TextEditingController _weightController =
+      TextEditingController(text: '10');
 
   @override
   void dispose() {
@@ -339,11 +341,12 @@ class _QuickCreateQuestionDialogState
       return;
     }
 
-    final created = await ref.read(adminQuestionActionProvider.notifier).quickCreate(
-          subjectId: widget.subjectId,
-          text: _questionController.text.trim(),
-          weight: int.parse(_weightController.text.trim()),
-        );
+    final created =
+        await ref.read(adminQuestionActionProvider.notifier).quickCreate(
+              subjectId: widget.subjectId,
+              text: _questionController.text.trim(),
+              weight: int.parse(_weightController.text.trim()),
+            );
 
     if (!mounted) {
       return;
@@ -362,7 +365,7 @@ class _QuickCreateQuestionDialogState
   Widget build(BuildContext context) {
     final actionState = ref.watch(adminQuestionActionProvider);
     return AlertDialog(
-      title: const Text('Quick Create Question'),
+      title: const Text('Buat Soal Cepat'),
       content: Form(
         key: _formKey,
         child: Column(

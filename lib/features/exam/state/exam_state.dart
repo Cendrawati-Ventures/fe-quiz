@@ -249,7 +249,7 @@ String _extractSubQuestionText(Map<String, dynamic> raw, String fallbackId) {
   final text = raw['text'] ?? raw['question'] ?? raw['label'] ?? raw['title'];
   final stringValue = text?.toString();
   if (stringValue == null || stringValue.trim().isEmpty) {
-    return 'Sub-question $fallbackId';
+    return 'Subsoal $fallbackId';
   }
   return stringValue.trim();
 }
@@ -750,6 +750,44 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
             clearErrorMessage: true,
           );
         } on ApiError catch (error) {
+          if (!_isRetryableApiError(error)) {
+            await _queue.markSuccess(item.id);
+            if (_shouldResetSessionFromApiError(error)) {
+              await clearSession();
+              state = state.copyWith(
+                submitState: SubmitState.failed,
+                isLoading: false,
+                errorMessage:
+                    'Sesi ujian sudah berakhir. Silakan login kembali lalu lanjutkan.',
+              );
+              break;
+            }
+
+            final isSubmit = item.type == OutboxItemType.submit;
+            state = state.copyWith(
+              connectionState: ConnectionStatus.online,
+              syncStatus: SyncStatus.pending,
+              submitState: isSubmit ? SubmitState.failed : state.submitState,
+              isLoading: isSubmit ? false : state.isLoading,
+              errorMessage: error.message,
+            );
+            if (isSubmit) {
+              break;
+            }
+            continue;
+          }
+
+          if (_shouldResetSessionFromApiError(error)) {
+            await clearSession();
+            state = state.copyWith(
+              submitState: SubmitState.failed,
+              isLoading: false,
+              errorMessage:
+                  'Sesi ujian sudah berakhir. Silakan mulai ujian baru.',
+            );
+            break;
+          }
+
           final action = await _queue.markFailure(item.id);
           final dropped = action == OutboxFailureAction.dropped;
           state = state.copyWith(
@@ -923,14 +961,48 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     return SyncStatus.retrying;
   }
 
+  bool _isRetryableApiError(ApiError error) {
+    final statusCode = error.statusCode;
+    if (statusCode == null) {
+      return true;
+    }
+    return statusCode == 429 || statusCode >= 500;
+  }
+
+  bool _shouldResetSessionFromApiError(ApiError error) {
+    final statusCode = error.statusCode;
+    if (statusCode == 401) {
+      return true;
+    }
+    if (statusCode != 400 && statusCode != 403) {
+      return false;
+    }
+
+    final message = error.message.toLowerCase();
+    if (statusCode == 403 &&
+        (message.contains('token') ||
+            message.contains('unauthorized') ||
+            message.contains('jwt') ||
+            message.contains('invalid') ||
+            message.contains('expired') ||
+            message.contains('akses ditolak'))) {
+      return true;
+    }
+
+    return message.contains('sesi ujian sudah tidak aktif') ||
+        message.contains('waktu sesi ujian sudah habis') ||
+        message.contains('ujian tidak tersedia pada waktu ini') ||
+        message.contains('ujian belum dipublikasikan');
+  }
+
   String _buildDroppedQueueMessage(OutboxItem item) {
     switch (item.type) {
       case OutboxItemType.answer:
-        return 'Autosave gagal setelah beberapa percobaan. Jawab ulang soal ini untuk mengirim kembali.';
+        return 'Simpan otomatis gagal setelah beberapa kali percobaan. Jawab ulang soal ini untuk mengirim lagi.';
       case OutboxItemType.proctoring:
-        return 'Sebagian event proctoring gagal dikirim setelah batas retry.';
+        return 'Sebagian data pengawasan gagal dikirim setelah batas percobaan.';
       case OutboxItemType.submit:
-        return 'Submit gagal setelah beberapa percobaan. Silakan retry submit.';
+        return 'Pengumpulan gagal setelah beberapa kali percobaan. Silakan coba kirim lagi.';
     }
   }
 
@@ -946,7 +1018,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
         await _enqueueProctoringEvent(
           type: ProctoringEventType.appBackground,
           value: 100,
-          warning: 'Aplikasi berpindah ke background terdeteksi.',
+          warning: 'Aplikasi berpindah ke latar belakang terdeteksi.',
         );
       }
     });
@@ -968,7 +1040,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
         await _enqueueProctoringEvent(
           type: ProctoringEventType.noise,
           value: value,
-          warning: value >= 70 ? 'Noise level tinggi terdeteksi.' : null,
+          warning: value >= 70 ? 'Suara sekitar terlalu bising.' : null,
         );
       },
     )..start();

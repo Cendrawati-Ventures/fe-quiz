@@ -52,12 +52,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _showInfo(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
   String get _usernameHint {
     return _selectedRole == _LandingRole.siswa
         ? 'Masukkan username atau NIS'
@@ -75,6 +69,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isWide = constraints.maxWidth >= 1024;
+            final isPhone = constraints.maxWidth < 700;
             final maxWidth =
                 constraints.maxWidth > 1260 ? 1260.0 : constraints.maxWidth;
 
@@ -95,7 +90,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(width: AppSpacing.lg),
                         Expanded(
-                          child: _buildLoginPanel(authState, compact: false),
+                          child: _buildLoginPanel(
+                            authState,
+                            compact: false,
+                            mobileFirst: false,
+                          ),
                         ),
                       ],
                     ),
@@ -106,14 +105,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
             return Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
+                constraints: BoxConstraints(maxWidth: isPhone ? 560 : 760),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.fromLTRB(
+                    isPhone ? AppSpacing.sm : AppSpacing.md,
+                    isPhone ? AppSpacing.sm : AppSpacing.md,
+                    isPhone ? AppSpacing.sm : AppSpacing.md,
+                    (isPhone ? AppSpacing.sm : AppSpacing.md) +
+                        MediaQuery.viewInsetsOf(context).bottom,
+                  ),
                   child: Column(
                     children: <Widget>[
-                      _buildIdentityPanel(textTheme, compact: true),
-                      const SizedBox(height: AppSpacing.md),
-                      _buildLoginPanel(authState, compact: true),
+                      if (isPhone) ...<Widget>[
+                        _buildLoginPanel(
+                          authState,
+                          compact: true,
+                          mobileFirst: true,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        _buildIdentityCompactPhone(textTheme),
+                      ] else ...<Widget>[
+                        _buildIdentityPanel(textTheme, compact: true),
+                        const SizedBox(height: AppSpacing.md),
+                        _buildLoginPanel(
+                          authState,
+                          compact: true,
+                          mobileFirst: false,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -126,12 +147,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Widget _buildIdentityPanel(TextTheme textTheme, {required bool compact}) {
-    final titleFontSize = compact ? 34.0 : 46.0;
-    final logoWrapSize = compact ? 132.0 : 150.0;
-    final logoSize = compact ? 108.0 : 126.0;
+    final titleFontSize = compact ? 32.0 : 46.0;
+    final logoWrapSize = compact ? 120.0 : 150.0;
+    final logoSize = compact ? 96.0 : 126.0;
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: EdgeInsets.all(compact ? AppSpacing.md : AppSpacing.lg),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         gradient: const LinearGradient(
@@ -267,8 +288,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         Text(
-                          'Mulai petualangan ujianmu dengan suasana edukatif '
-                          'yang hangat untuk peserta dari berbagai daerah.',
+                          'Silakan masuk untuk mulai ujian. '
+                          'Halaman ini dapat dipakai guru maupun siswa.',
                           style: textTheme.bodyLarge?.copyWith(
                             color: const Color(0xFFE3F8E5),
                             height: 1.55,
@@ -282,7 +303,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: AppSpacing.lg),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding:
+                    EdgeInsets.all(compact ? AppSpacing.md : AppSpacing.lg),
                 decoration: BoxDecoration(
                   color: const Color(0xFFEAF1EC).withValues(alpha: 0.96),
                   borderRadius: BorderRadius.circular(24),
@@ -371,8 +393,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
-                        'Siapkan paket ujian di panel Admin '
-                        'sebelum siswa mencoba login.',
+                        'Siapkan paket ujian di halaman admin '
+                        'sebelum siswa masuk.',
                         style: textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFFE9FBEA),
                           fontWeight: FontWeight.w600,
@@ -401,15 +423,98 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildLoginPanel(AuthState authState, {required bool compact}) {
+  Widget _buildIdentityCompactPhone(TextTheme textTheme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[Color(0xFF4DB956), Color(0xFF1D7E4A)],
+        ),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x29223620),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFF6F6F2),
+              border: Border.all(color: const Color(0xFF19A453), width: 3),
+            ),
+            child: const Icon(
+              Icons.school_rounded,
+              size: 28,
+              color: Color(0xFF218D4D),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Quiz Bali Q_Ta',
+                  style: textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Satu Hati, Satu Jiwa, Satu Cinta',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFFE9FBEA),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Portal login untuk guru dan siswa.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFFE3F8E5),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'QUIZ-BALI-Q_TA V1.0.0',
+                  style: textTheme.labelMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoginPanel(
+    AuthState authState, {
+    required bool compact,
+    required bool mobileFirst,
+  }) {
     final textTheme = Theme.of(context).textTheme;
-    final arenaTitleSize = compact ? 32.0 : 40.0;
-    final supportTitleSize = compact ? 22.0 : 28.0;
+    final arenaTitleSize = mobileFirst ? 28.0 : (compact ? 32.0 : 40.0);
+    final panelPadding = mobileFirst ? AppSpacing.md : AppSpacing.lg;
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: EdgeInsets.all(panelPadding),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(mobileFirst ? 18 : 22),
         color: const Color(0xFFF5F4EE),
         border: Border.all(color: const Color(0xFFD8D0BD)),
       ),
@@ -422,37 +527,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    'Masuk ke Arena',
+                    'Masuk ke Sistem Ujian',
                     style: textTheme.headlineMedium?.copyWith(
                       fontSize: arenaTitleSize,
                       color: const Color(0xFF53462D),
                     ),
                   ),
                 ),
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: const Color(0xFFF1ECE0),
-                    border: Border.all(color: const Color(0xFFD0C5AB)),
+                if (!mobileFirst)
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: const Color(0xFFF1ECE0),
+                      border: Border.all(color: const Color(0xFFD0C5AB)),
+                    ),
+                    child: const Icon(
+                      Icons.question_mark_rounded,
+                      size: 18,
+                      color: Color(0xFF675837),
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.question_mark_rounded,
-                    size: 18,
-                    color: Color(0xFF675837),
-                  ),
-                ),
               ],
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Pilih peranmu, lalu lanjutkan perjalanan belajar dan cerita ujian.',
+              'Pilih peran, lalu masuk ke sistem ujian.',
               style: textTheme.bodyLarge?.copyWith(
                 color: const Color(0xFF7B6848),
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
+            SizedBox(height: mobileFirst ? AppSpacing.md : AppSpacing.lg),
             DropdownButtonFormField<_LandingRole>(
               initialValue: _selectedRole,
               decoration: const InputDecoration(labelText: 'Masuk sebagai'),
@@ -492,8 +598,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             TextFormField(
               controller: _passwordController,
               decoration: InputDecoration(
-                labelText: 'Password',
-                hintText: 'Masukkan password',
+                labelText: 'Kata Sandi',
+                hintText: 'Masukkan kata sandi',
                 suffixIcon: IconButton(
                   onPressed: () {
                     setState(() {
@@ -501,8 +607,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     });
                   },
                   tooltip: _obscurePassword
-                      ? 'Lihat password'
-                      : 'Sembunyikan password',
+                      ? 'Lihat kata sandi'
+                      : 'Sembunyikan kata sandi',
                   icon: Icon(
                     _obscurePassword
                         ? Icons.visibility_outlined
@@ -515,14 +621,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               onFieldSubmitted: (_) => _onLoginPressed(),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Password wajib diisi';
+                  return 'Kata sandi wajib diisi';
                 }
                 return null;
               },
             ),
             const SizedBox(height: AppSpacing.md),
             _buildActionButton(
-              label: 'Mulai Perjalanan',
+              label: 'Masuk',
               isLoading: authState.isLoading,
               onPressed: _onLoginPressed,
               fullWidth: true,
@@ -538,40 +644,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: AppSpacing.lg),
-            _buildSupportCard(
-              compact: compact,
-              supportTitleSize: supportTitleSize,
-              title: 'Impor Paket Sebelum Login',
-              description:
-                  'Paket dari admin berisi mata pelajaran, soal, dan akun '
-                  'siswa yang boleh ikut ujian. Jalankan sekali sebelum '
-                  'memasukkan username.',
-              buttonLabel: 'Pilih Paket dari Admin',
-              onPressed: () {
-                _showInfo('Fitur impor paket akan segera tersedia.');
-              },
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _buildSupportCard(
-              compact: compact,
-              supportTitleSize: supportTitleSize,
-              title: 'Sinkronisasi Otomatis via Jaringan',
-              description:
-                  'Jika PC admin menyalakan server bawaan, perangkat ini akan '
-                  'otomatis mencari siaran paket tanpa perlu IP. Klik tombol '
-                  'di bawah bila indikator menemukan admin.',
-              buttonLabel: 'Tarik Paket dari Admin',
-              onPressed: () {
-                _showInfo('Pencarian server admin belum menemukan perangkat.');
-              },
-              warningText: 'Belum menemukan server admin di jaringan ini. '
-                  'Pastikan tersambung ke WI-FI / LAN yang sama.',
-            ),
             const SizedBox(height: AppSpacing.md),
             Center(
               child: Text(
-                'Versi offline ringan, siap untuk laptop sekolah.',
+                mobileFirst
+                    ? 'Mode ringan, cocok untuk perangkat sekolah.'
+                    : 'Mode ringan, cocok untuk laptop sekolah.',
                 style: textTheme.bodyMedium?.copyWith(
                   color: const Color(0xFF76684D),
                 ),
@@ -579,64 +657,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildSupportCard({
-    required bool compact,
-    required double supportTitleSize,
-    required String title,
-    required String description,
-    required String buttonLabel,
-    required VoidCallback onPressed,
-    String? warningText,
-  }) {
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: const Color(0xFFEAF1EC),
-        border: Border.all(color: const Color(0xFF9FD2B7)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: textTheme.titleLarge?.copyWith(
-              color: const Color(0xFF167546),
-              fontSize: supportTitleSize,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            description,
-            style: textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFF655D4D),
-              height: 1.45,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _buildActionButton(
-            label: buttonLabel,
-            isLoading: false,
-            onPressed: onPressed,
-            fullWidth: compact,
-          ),
-          if (warningText != null) ...<Widget>[
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              warningText,
-              style: textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFFE02828),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ],
       ),
     );
   }

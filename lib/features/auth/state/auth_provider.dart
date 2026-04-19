@@ -1,8 +1,12 @@
+import 'dart:async';
+
+import '../../../core/auth/auth_event_bus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_error.dart';
 import '../../../core/storage/secure_storage.dart';
+import '../../exam/state/exam_state.dart';
 import '../model/auth_user.dart';
 import '../model/login_request.dart';
 import '../service/auth_service.dart';
@@ -57,11 +61,30 @@ final authProvider = NotifierProvider<AuthNotifier, AuthState>(
 class AuthNotifier extends Notifier<AuthState> {
   late final AuthService _service;
   late final AppSecureStorage _secureStorage;
+  StreamSubscription<AuthEvent>? _authEventSubscription;
 
   @override
   AuthState build() {
     _service = ref.read(authServiceProvider);
     _secureStorage = ref.read(secureStorageProvider);
+    final eventBus = ref.read(authEventBusProvider);
+
+    _authEventSubscription?.cancel();
+    _authEventSubscription = eventBus.stream.listen((event) {
+      if (event != AuthEvent.unauthorized) {
+        return;
+      }
+      state = const AuthState(status: AuthStatus.unauthenticated);
+      Future<void>(() async {
+        await ref.read(examSessionProvider.notifier).clearSession();
+      });
+    });
+
+    ref.onDispose(() {
+      _authEventSubscription?.cancel();
+      _authEventSubscription = null;
+    });
+
     Future<void>(() async {
       await _restoreSession();
     });

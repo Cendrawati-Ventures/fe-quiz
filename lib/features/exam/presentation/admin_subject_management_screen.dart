@@ -9,6 +9,7 @@ import '../../../shared/components/app_snackbar.dart';
 import '../model/exam_models.dart';
 import '../state/admin_subject_state.dart';
 import '../state/exam_state.dart';
+import 'widgets/admin_layout.dart';
 import 'widgets/subject_form_fields.dart';
 
 class AdminSubjectManagementScreen extends ConsumerStatefulWidget {
@@ -33,7 +34,7 @@ class _AdminSubjectManagementScreenState
 
     AppSnackBar.success(
       context,
-      'Subject berhasil dibuat. Lanjutkan edit lengkap.',
+      'Mata pelajaran berhasil dibuat. Lanjutkan dengan pengaturan lengkap.',
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -46,62 +47,59 @@ class _AdminSubjectManagementScreenState
   @override
   Widget build(BuildContext context) {
     final subjectsAsync = ref.watch(subjectListProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Subject Management')),
-      body: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            AppButton(
-              label: 'Quick Create Subject',
-              onPressed: _showQuickCreateDialog,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Expanded(
-              child: subjectsAsync.when(
-                data: (subjects) {
-                  if (subjects.isEmpty) {
-                    return const AppCard(
-                      title: 'Subject kosong',
-                      subtitle: 'Belum ada subject.',
-                    );
-                  }
-                  return ListView.separated(
-                    itemCount: subjects.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (context, index) {
-                      final item = subjects[index];
-                      return AppCard(
-                        title: item.name,
-                        subtitle:
-                            '${item.description}\nDuration: ${item.durationMinutes} menit\nAttempt limit: ${item.attemptLimit}',
-                        status: item.allowReview ? 'Allow Review' : 'No Review',
-                        child: AppButton(
-                          label: 'Edit Subject',
-                          variant: AppButtonVariant.secondary,
-                          onPressed: () =>
-                              context.push('/admin/subjects/${item.id}/edit'),
-                        ),
-                      );
-                    },
+    return AdminLayout(
+      title: 'Kelola Mata Pelajaran',
+      subtitle: 'Atur data materi, durasi, dan batas percobaan.',
+      activeSection: AdminSection.subjects,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          AppButton(
+            label: 'Buat Mata Pelajaran Cepat',
+            onPressed: _showQuickCreateDialog,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Expanded(
+            child: subjectsAsync.when(
+              data: (subjects) {
+                if (subjects.isEmpty) {
+                  return const AppCard(
+                    title: 'Mata pelajaran masih kosong',
+                    subtitle: 'Belum ada mata pelajaran.',
                   );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, __) => const AppCard(
-                  title: 'Gagal memuat subject',
-                  subtitle: 'Data subject belum bisa dimuat. Coba lagi sebentar.',
-                ),
+                }
+                return ListView.separated(
+                  itemCount: subjects.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: AppSpacing.sm),
+                  itemBuilder: (context, index) {
+                    final item = subjects[index];
+                    return AppCard(
+                      title: item.name,
+                      subtitle:
+                          '${item.description}\nDurasi: ${item.durationMinutes} menit\nBatas percobaan: ${item.attemptLimit}',
+                      status: item.allowReview
+                          ? 'Siswa boleh meninjau jawaban'
+                          : 'Siswa tidak boleh meninjau jawaban',
+                      child: AppButton(
+                        label: 'Ubah Mata Pelajaran',
+                        variant: AppButtonVariant.secondary,
+                        onPressed: () =>
+                            context.push('/admin/subjects/${item.id}/edit'),
+                      ),
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const AppCard(
+                title: 'Gagal memuat mata pelajaran',
+                subtitle:
+                    'Data mata pelajaran belum bisa dimuat. Coba lagi sebentar.',
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            AppButton(
-              label: 'Kembali ke Dashboard',
-              onPressed: () => context.go('/admin/dashboard'),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -136,11 +134,12 @@ class _QuickCreateSubjectDialogState
       return;
     }
 
-    final created = await ref.read(adminSubjectActionProvider.notifier).quickCreate(
-          name: _nameController.text.trim(),
-          description: _descriptionController.text.trim(),
-          durationMinutes: int.parse(_durationController.text.trim()),
-        );
+    final created =
+        await ref.read(adminSubjectActionProvider.notifier).quickCreate(
+              name: _nameController.text.trim(),
+              description: _descriptionController.text.trim(),
+              durationMinutes: int.parse(_durationController.text.trim()),
+            );
 
     if (!mounted) {
       return;
@@ -152,7 +151,7 @@ class _QuickCreateSubjectDialogState
     }
 
     final error = ref.read(adminSubjectActionProvider).errorMessage;
-    AppSnackBar.error(context, error ?? 'Gagal membuat subject');
+    AppSnackBar.error(context, error ?? 'Gagal membuat mata pelajaran.');
   }
 
   @override
@@ -160,7 +159,7 @@ class _QuickCreateSubjectDialogState
     final actionState = ref.watch(adminSubjectActionProvider);
 
     return AlertDialog(
-      title: const Text('Quick Create Subject'),
+      title: const Text('Buat Mata Pelajaran Cepat'),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -169,7 +168,7 @@ class _QuickCreateSubjectDialogState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const Text(
-                'Isi data minimum dulu (nama, deskripsi, durasi). Setelah dibuat, kamu akan langsung diarahkan ke halaman edit lengkap.',
+                'Isi data dasar dulu (nama, deskripsi, durasi). Setelah dibuat, kamu akan langsung masuk ke halaman pengaturan lengkap.',
               ),
               const SizedBox(height: AppSpacing.md),
               SubjectFormFields(

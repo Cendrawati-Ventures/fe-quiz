@@ -23,7 +23,7 @@ class WarningBanner extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final palette = _palette(type);
+    final palette = _palette(context, type);
 
     return Container(
       width: double.infinity,
@@ -51,26 +51,27 @@ class WarningBanner extends StatelessWidget {
     );
   }
 
-  _BannerPalette _palette(WarningBannerType type) {
+  _BannerPalette _palette(BuildContext context, WarningBannerType type) {
+    final scheme = Theme.of(context).colorScheme;
     switch (type) {
       case WarningBannerType.info:
-        return const _BannerPalette(
-          background: Color(0xFFE7F5FF),
-          border: Color(0xFF9BD1FF),
-          textColor: Color(0xFF0B4F84),
+        return _BannerPalette(
+          background: scheme.primary.withValues(alpha: 0.1),
+          border: scheme.primary.withValues(alpha: 0.28),
+          textColor: scheme.primary,
           icon: Icons.info_outline,
         );
       case WarningBannerType.warning:
-        return const _BannerPalette(
-          background: Color(0xFFFFF7E8),
-          border: Color(0xFFF5CF8B),
+        return _BannerPalette(
+          background: AppColors.warning.withValues(alpha: 0.12),
+          border: AppColors.warning.withValues(alpha: 0.32),
           textColor: AppColors.warning,
           icon: Icons.warning_amber_rounded,
         );
       case WarningBannerType.danger:
-        return const _BannerPalette(
-          background: Color(0xFFFFEBED),
-          border: Color(0xFFF4AAB0),
+        return _BannerPalette(
+          background: AppColors.danger.withValues(alpha: 0.11),
+          border: AppColors.danger.withValues(alpha: 0.3),
           textColor: AppColors.danger,
           icon: Icons.error_outline,
         );

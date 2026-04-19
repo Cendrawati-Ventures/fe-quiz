@@ -8,6 +8,7 @@ import '../../../shared/components/app_card.dart';
 import '../../../shared/components/app_snackbar.dart';
 import '../model/exam_models.dart';
 import '../state/admin_question_state.dart';
+import 'widgets/admin_layout.dart';
 import 'widgets/question_form_fields.dart';
 
 class AdminQuestionEditScreen extends ConsumerStatefulWidget {
@@ -25,7 +26,8 @@ class AdminQuestionEditScreen extends ConsumerStatefulWidget {
       _AdminQuestionEditScreenState();
 }
 
-class _AdminQuestionEditScreenState extends ConsumerState<AdminQuestionEditScreen> {
+class _AdminQuestionEditScreenState
+    extends ConsumerState<AdminQuestionEditScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _questionController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
@@ -72,7 +74,8 @@ class _AdminQuestionEditScreenState extends ConsumerState<AdminQuestionEditScree
       _optionControllers[index].text = optionByValue[key] ?? 'Opsi $key';
     }
 
-    final selectedIndex = _optionValues.indexOf(question.correctAnswer.toUpperCase());
+    final selectedIndex =
+        _optionValues.indexOf(question.correctAnswer.toUpperCase());
     _correctAnswerIndex = selectedIndex >= 0 ? selectedIndex : 0;
     _initialized = true;
   }
@@ -86,9 +89,8 @@ class _AdminQuestionEditScreenState extends ConsumerState<AdminQuestionEditScree
       return;
     }
 
-    final labels = _optionControllers
-        .map((controller) => controller.text.trim())
-        .toList();
+    final labels =
+        _optionControllers.map((controller) => controller.text.trim()).toList();
     if (labels.toSet().length != labels.length) {
       AppSnackBar.error(context, 'Teks setiap opsi harus berbeda.');
       return;
@@ -124,7 +126,8 @@ class _AdminQuestionEditScreenState extends ConsumerState<AdminQuestionEditScree
     }
 
     final error = ref.read(adminQuestionActionProvider).errorMessage;
-    AppSnackBar.error(context, error ?? 'Perubahan pertanyaan belum berhasil disimpan.');
+    AppSnackBar.error(
+        context, error ?? 'Perubahan pertanyaan belum berhasil disimpan.');
   }
 
   Future<void> _delete() async {
@@ -175,95 +178,96 @@ class _AdminQuestionEditScreenState extends ConsumerState<AdminQuestionEditScree
 
   @override
   Widget build(BuildContext context) {
-    final questionsAsync = ref.watch(questionListBySubjectProvider(widget.subjectId));
+    final questionsAsync =
+        ref.watch(questionListBySubjectProvider(widget.subjectId));
     final actionState = ref.watch(adminQuestionActionProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Edit Question')),
-      body: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: questionsAsync.when(
-          data: (questions) {
-            AdminQuestion? question;
-            for (final item in questions) {
-              if (item.id == widget.questionId) {
-                question = item;
-                break;
-              }
+    return AdminLayout(
+      title: 'Ubah Soal',
+      subtitle: 'Perbarui teks soal, opsi, bobot, dan jawaban benar.',
+      activeSection: AdminSection.questions,
+      child: questionsAsync.when(
+        data: (questions) {
+          AdminQuestion? question;
+          for (final item in questions) {
+            if (item.id == widget.questionId) {
+              question = item;
+              break;
             }
+          }
 
-            if (question == null) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  const AppCard(
-                    title: 'Pertanyaan tidak ditemukan',
-                    subtitle: 'Data pertanyaan belum tersedia atau sudah dihapus.',
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  AppButton(
-                    label: 'Kembali ke Question Management',
-                    onPressed: () =>
-                        context.go('/admin/questions?subjectId=${widget.subjectId}'),
-                  ),
-                ],
-              );
-            }
-
-            _initForm(question);
-
-            return Form(
-              key: _formKey,
-              child: ListView(
-                children: <Widget>[
-                  AppCard(
-                    title: 'Edit Pertanyaan Pilihan Ganda',
-                    subtitle:
-                        'Soal harus memiliki tepat 4 opsi jawaban dan 1 jawaban benar.',
-                    child: QuestionFormFields(
-                      questionTextController: _questionController,
-                      weightController: _weightController,
-                      optionControllers: _optionControllers,
-                      correctAnswerIndex: _correctAnswerIndex,
-                      onCorrectAnswerChanged: (value) {
-                        setState(() {
-                          _correctAnswerIndex = value;
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  AppButton(
-                    label: 'Simpan Perubahan',
-                    loading: actionState.isUpdating,
-                    disabled: actionState.isDeleting,
-                    onPressed: _save,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  AppButton(
-                    label: 'Hapus Pertanyaan',
-                    variant: AppButtonVariant.danger,
-                    loading: actionState.isDeleting,
-                    disabled: actionState.isUpdating,
-                    onPressed: _delete,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  AppButton(
-                    label: 'Kembali ke Question Management',
-                    variant: AppButtonVariant.secondary,
-                    disabled: actionState.isUpdating || actionState.isDeleting,
-                    onPressed: () =>
-                        context.go('/admin/questions?subjectId=${widget.subjectId}'),
-                  ),
-                ],
-              ),
+          if (question == null) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const AppCard(
+                  title: 'Pertanyaan tidak ditemukan',
+                  subtitle:
+                      'Data pertanyaan belum tersedia atau sudah dihapus.',
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppButton(
+                  label: 'Kembali ke Kelola Soal',
+                  onPressed: () => context
+                      .go('/admin/questions?subjectId=${widget.subjectId}'),
+                ),
+              ],
             );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const AppCard(
-            title: 'Gagal memuat pertanyaan',
-            subtitle: 'Data pertanyaan belum bisa dimuat. Coba lagi sebentar.',
-          ),
+          }
+
+          _initForm(question);
+
+          return Form(
+            key: _formKey,
+            child: ListView(
+              children: <Widget>[
+                AppCard(
+                  title: 'Ubah Soal Pilihan Ganda',
+                  subtitle:
+                      'Soal harus memiliki tepat 4 opsi jawaban dan 1 jawaban benar.',
+                  child: QuestionFormFields(
+                    questionTextController: _questionController,
+                    weightController: _weightController,
+                    optionControllers: _optionControllers,
+                    correctAnswerIndex: _correctAnswerIndex,
+                    onCorrectAnswerChanged: (value) {
+                      setState(() {
+                        _correctAnswerIndex = value;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppButton(
+                  label: 'Simpan Perubahan',
+                  loading: actionState.isUpdating,
+                  disabled: actionState.isDeleting,
+                  onPressed: _save,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                AppButton(
+                  label: 'Hapus Pertanyaan',
+                  variant: AppButtonVariant.danger,
+                  loading: actionState.isDeleting,
+                  disabled: actionState.isUpdating,
+                  onPressed: _delete,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                AppButton(
+                  label: 'Kembali ke Kelola Soal',
+                  variant: AppButtonVariant.secondary,
+                  disabled: actionState.isUpdating || actionState.isDeleting,
+                  onPressed: () => context
+                      .go('/admin/questions?subjectId=${widget.subjectId}'),
+                ),
+              ],
+            ),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => const AppCard(
+          title: 'Gagal memuat pertanyaan',
+          subtitle: 'Data pertanyaan belum bisa dimuat. Coba lagi sebentar.',
         ),
       ),
     );

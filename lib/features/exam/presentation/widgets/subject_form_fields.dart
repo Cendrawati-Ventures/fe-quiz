@@ -32,7 +32,7 @@ class SubjectFormFields extends StatelessWidget {
         TextFormField(
           controller: nameController,
           decoration: const InputDecoration(
-            labelText: 'Nama Subject',
+            labelText: 'Nama Mata Pelajaran',
             hintText: 'Contoh: Matematika Dasar',
           ),
           textInputAction: TextInputAction.next,
@@ -43,7 +43,7 @@ class SubjectFormFields extends StatelessWidget {
           controller: descriptionController,
           decoration: const InputDecoration(
             labelText: 'Deskripsi',
-            hintText: 'Ringkasan materi subject',
+            hintText: 'Ringkasan materi mata pelajaran',
           ),
           minLines: 2,
           maxLines: 4,
@@ -72,7 +72,7 @@ class SubjectFormFields extends StatelessWidget {
           TextFormField(
             controller: attemptLimitController,
             decoration: const InputDecoration(
-              labelText: 'Batas Attempt',
+              labelText: 'Batas Percobaan',
               hintText: 'Contoh: 1',
             ),
             keyboardType: const TextInputType.numberWithOptions(
@@ -89,7 +89,7 @@ class SubjectFormFields extends StatelessWidget {
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
             value: allowReview,
-            title: const Text('Izinkan Review Jawaban'),
+            title: const Text('Izinkan Tinjau Jawaban'),
             subtitle: const Text(
               'Jika aktif, siswa dapat melihat ringkasan jawabannya.',
             ),
@@ -103,13 +103,13 @@ class SubjectFormFields extends StatelessWidget {
   static String? _validateName(String? value) {
     final text = value?.trim() ?? '';
     if (text.isEmpty) {
-      return 'Nama subject wajib diisi';
+      return 'Nama mata pelajaran wajib diisi';
     }
     if (text.length < 2) {
-      return 'Nama subject minimal 2 karakter';
+      return 'Nama mata pelajaran minimal 2 karakter';
     }
     if (text.length > 150) {
-      return 'Nama subject maksimal 150 karakter';
+      return 'Nama mata pelajaran maksimal 150 karakter';
     }
     return null;
   }
@@ -144,10 +144,10 @@ class SubjectFormFields extends StatelessWidget {
     final text = value?.trim() ?? '';
     final number = int.tryParse(text);
     if (number == null) {
-      return 'Batas attempt harus berupa angka';
+      return 'Batas percobaan harus berupa angka';
     }
     if (number <= 0) {
-      return 'Batas attempt harus lebih dari 0';
+      return 'Batas percobaan harus lebih dari 0';
     }
     return null;
   }

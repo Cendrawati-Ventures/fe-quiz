@@ -16,19 +16,33 @@ class ConnectionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final statusColor = isOnline ? AppColors.success : AppColors.warning;
-    final statusText = isOnline ? 'Online' : 'Offline';
+    final statusText = isOnline ? 'Terhubung' : 'Terputus';
+    final syncLabel = _syncStatusLabel(syncStatus);
 
     return Chip(
       backgroundColor: statusColor.withValues(alpha: 0.14),
       side: BorderSide(color: statusColor.withValues(alpha: 0.35)),
       avatar: CircleAvatar(backgroundColor: statusColor, radius: 5),
       label: Text(
-        '$statusText | $syncStatus',
+        '$statusText | $syncLabel',
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
               color: scheme.onSurface,
               fontWeight: FontWeight.w700,
             ),
       ),
     );
+  }
+
+  String _syncStatusLabel(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'synced':
+        return 'Tersimpan';
+      case 'pending':
+        return 'Menunggu Kirim';
+      case 'retrying':
+        return 'Mencoba Lagi';
+      default:
+        return 'Memproses';
+    }
   }
 }

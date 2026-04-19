@@ -6,12 +6,12 @@ import 'exam_state.dart';
 
 final questionListBySubjectProvider =
     FutureProvider.family<List<AdminQuestion>, String>((ref, subjectId) async {
-      if (subjectId.trim().isEmpty) {
-        return const <AdminQuestion>[];
-      }
-      final service = ref.watch(examServiceProvider);
-      return service.listQuestionsBySubject(subjectId);
-    });
+  if (subjectId.trim().isEmpty) {
+    return const <AdminQuestion>[];
+  }
+  final service = ref.watch(examServiceProvider);
+  return service.listQuestionsBySubject(subjectId);
+});
 
 class AdminQuestionActionState {
   const AdminQuestionActionState({
@@ -48,11 +48,12 @@ class AdminQuestionActionState {
 
 final adminQuestionActionProvider =
     NotifierProvider<AdminQuestionActionNotifier, AdminQuestionActionState>(
-      AdminQuestionActionNotifier.new,
-    );
+  AdminQuestionActionNotifier.new,
+);
 
 class AdminQuestionActionNotifier extends Notifier<AdminQuestionActionState> {
-  static const List<AdminQuestionOption> _defaultOptions = <AdminQuestionOption>[
+  static const List<AdminQuestionOption> _defaultOptions =
+      <AdminQuestionOption>[
     AdminQuestionOption(value: 'A', label: 'Opsi A'),
     AdminQuestionOption(value: 'B', label: 'Opsi B'),
     AdminQuestionOption(value: 'C', label: 'Opsi C'),

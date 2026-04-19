@@ -4,20 +4,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
+import '../auth/auth_event_bus.dart';
 import '../storage/secure_storage.dart';
 
 final apiClientProvider = Provider<Dio>((ref) {
   final secureStorage = ref.watch(secureStorageProvider);
-  return ApiClient(secureStorage).dio;
+  final authEventBus = ref.watch(authEventBusProvider);
+  return ApiClient(secureStorage, authEventBus: authEventBus).dio;
 });
 
 class ApiClient {
-  ApiClient(this._secureStorage, {Dio? dio, Logger? logger})
-      : _dio = dio ?? Dio(_buildBaseOptions()),
+  ApiClient(
+    this._secureStorage, {
+    AuthEventBus? authEventBus,
+    Dio? dio,
+    Logger? logger,
+  })  : _authEventBus = authEventBus,
+        _dio = dio ?? Dio(_buildBaseOptions()),
         _logger = logger ?? Logger() {
     _setupInterceptors();
     if (kDebugMode) {
-      _logger.i('API base URL: ${_dio.options.baseUrl}');
+      _logger.i('URL dasar API: ${_dio.options.baseUrl}');
     }
   }
 
@@ -27,6 +34,7 @@ class ApiClient {
 
   final Dio _dio;
   final AppSecureStorage _secureStorage;
+  final AuthEventBus? _authEventBus;
   final Logger _logger;
   bool _isHandlingUnauthorized = false;
 
@@ -103,10 +111,30 @@ class ApiClient {
 
   bool _shouldClearToken(DioException error) {
     final statusCode = error.response?.statusCode;
-    if (statusCode != 401) {
+    if (statusCode != 401 && statusCode != 403) {
       return false;
     }
-    return !_shouldSkipAuth(error.requestOptions);
+    if (_shouldSkipAuth(error.requestOptions)) {
+      return false;
+    }
+    if (statusCode == 401) {
+      return true;
+    }
+
+    final data = error.response?.data;
+    final serverMessage = data is Map<String, dynamic>
+        ? data['message']?.toString().toLowerCase()
+        : data?.toString().toLowerCase();
+    if (serverMessage == null || serverMessage.isEmpty) {
+      return false;
+    }
+
+    return serverMessage.contains('unauthorized') ||
+        serverMessage.contains('token') ||
+        serverMessage.contains('jwt') ||
+        serverMessage.contains('invalid') ||
+        serverMessage.contains('expired') ||
+        serverMessage.contains('akses ditolak');
   }
 
   Future<void> _clearAuthToken() async {
@@ -116,6 +144,7 @@ class ApiClient {
     _isHandlingUnauthorized = true;
     try {
       await _secureStorage.clearAuthSession();
+      _authEventBus?.emitUnauthorized();
     } finally {
       _isHandlingUnauthorized = false;
     }
@@ -123,7 +152,7 @@ class ApiClient {
 
   void _logError(DioException error) {
     _logger.e(
-      'API request failed: ${error.requestOptions.method} ${error.requestOptions.uri}',
+      'Permintaan API gagal: ${error.requestOptions.method} ${error.requestOptions.uri}',
       error: error.error ?? error.message,
       stackTrace: error.stackTrace,
     );

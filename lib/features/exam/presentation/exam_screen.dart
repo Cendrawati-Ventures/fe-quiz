@@ -69,7 +69,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
     if (!state.hasActiveAttempt || question == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Exam Session')),
+        appBar: AppBar(title: const Text('Sesi Ujian')),
         body: Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Column(
@@ -109,9 +109,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
           context: context,
           builder: (context) {
             return AlertDialog(
-              title: const Text('Keluar dari exam?'),
+              title: const Text('Keluar dari ujian?'),
               content: const Text(
-                'Progress tetap tersimpan, tapi event proctoring akan tercatat.',
+                'Jawaban tetap tersimpan, tetapi sistem akan mencatat aktivitas keluar aplikasi.',
               ),
               actions: <Widget>[
                 TextButton(
@@ -136,7 +136,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         onPointerDown: (_) => notifier.onUserInteraction(),
         child: Scaffold(
           appBar: AppBar(
-            title: Text(state.exam?.title ?? 'Exam'),
+            title: Text(state.exam?.title ?? 'Ujian'),
             actions: <Widget>[
               Padding(
                 padding: const EdgeInsets.only(right: AppSpacing.md),
@@ -220,7 +220,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
           ),
           bottomNavigationBar: BottomActionBar(
             secondaryAction: BottomActionBarButton(
-              label: currentIndex == 0 ? 'Previous' : 'Previous',
+              label: 'Sebelumnya',
               onPressed: currentIndex == 0 ? null : notifier.previousQuestion,
               disabled: currentIndex == 0,
               variant: AppButtonVariant.secondary,
@@ -229,8 +229,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
               children: <Widget>[
                 Expanded(
                   child: BottomActionBarButton(
-                    label:
-                        currentIndex == totalQuestions - 1 ? 'Submit' : 'Next',
+                    label: currentIndex == totalQuestions - 1
+                        ? 'Kumpulkan'
+                        : 'Berikutnya',
                     onPressed: currentIndex == totalQuestions - 1
                         ? () async {
                             final shouldSubmit = await _confirmSubmit(
@@ -364,7 +365,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
               final errorText = session.errorMessage ?? message;
 
               return AlertDialog(
-                title: const Text('Submit Gagal'),
+                title: const Text('Pengumpulan Gagal'),
                 content: Text(errorText),
                 actions: <Widget>[
                   TextButton(
@@ -381,7 +382,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Retry Submit'),
+                        : const Text('Coba Kirim Lagi'),
                   ),
                 ],
               );
@@ -426,7 +427,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
       barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Konfirmasi Submit'),
+          title: const Text('Konfirmasi Pengumpulan'),
           content: Text(
             'Apakah kamu yakin ingin mengumpulkan ujian?\n'
             'Jawaban belum lengkap: $unansweredCount soal.',
@@ -438,7 +439,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Submit'),
+              child: const Text('Kumpulkan'),
             ),
           ],
         );

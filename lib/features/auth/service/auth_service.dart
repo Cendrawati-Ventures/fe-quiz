@@ -9,13 +9,21 @@ class AuthService {
   AuthService(this._dio);
 
   final Dio _dio;
+  static const Duration _authConnectTimeout = Duration(seconds: 8);
+  static const Duration _authSendTimeout = Duration(seconds: 8);
+  static const Duration _authReceiveTimeout = Duration(seconds: 12);
 
   Future<AuthSession> login(LoginRequest request) async {
     try {
       final response = await _dio.post<dynamic>(
         '/auth/login',
         data: request.toJson(),
-        options: Options(extra: <String, dynamic>{'skipAuthToken': true}),
+        options: Options(
+          extra: <String, dynamic>{'skipAuthToken': true},
+          connectTimeout: _authConnectTimeout,
+          sendTimeout: _authSendTimeout,
+          receiveTimeout: _authReceiveTimeout,
+        ),
       );
 
       final data = response.data;
@@ -37,7 +45,14 @@ class AuthService {
 
   Future<AuthUser> me() async {
     try {
-      final response = await _dio.get<dynamic>('/users/me');
+      final response = await _dio.get<dynamic>(
+        '/users/me',
+        options: Options(
+          connectTimeout: _authConnectTimeout,
+          sendTimeout: _authSendTimeout,
+          receiveTimeout: _authReceiveTimeout,
+        ),
+      );
       final data = response.data;
       if (data is Map<String, dynamic>) {
         return AuthUser.fromJson(data);

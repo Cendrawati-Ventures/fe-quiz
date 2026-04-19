@@ -36,7 +36,7 @@ class ResultScreen extends ConsumerWidget {
               data: (results) {
                 if (results.isEmpty) {
                   return const AppCard(
-                    title: 'Result kosong',
+                    title: 'Hasil masih kosong',
                     subtitle: 'Kamu belum mengerjakan ujian.',
                   );
                 }
@@ -46,7 +46,7 @@ class ResultScreen extends ConsumerWidget {
                         (result) => Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                           child: _ResultCard(
-                            title: result.examTitle ?? 'Result',
+                            title: result.examTitle ?? 'Hasil',
                             result: result,
                           ),
                         ),
@@ -56,14 +56,14 @@ class ResultScreen extends ConsumerWidget {
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => AppCard(
-                title: 'Gagal memuat result',
+                title: 'Gagal memuat hasil',
                 subtitle: error.toString(),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
             AppButton(
               label: authState.isAdmin
-                  ? 'Kembali ke Dashboard Admin'
+                  ? 'Kembali ke Beranda Admin'
                   : 'Kembali ke Daftar Ujian',
               onPressed: () => context.go(
                 authState.isAdmin ? '/admin/dashboard' : '/exam',
@@ -90,7 +90,7 @@ class _ResultCard extends StatelessWidget {
     return AppCard(
       title: title,
       subtitle:
-          'Score: ${result.score}\nCorrect: ${result.correct}\nWrong: ${result.wrong}\nRisk: ${riskLevelToString(result.riskLevel)}',
+          'Nilai: ${result.score}\nBenar: ${result.correct}\nSalah: ${result.wrong}\nRisiko: ${riskLevelLabel(result.riskLevel)}',
       status: result.subjectName,
     );
   }

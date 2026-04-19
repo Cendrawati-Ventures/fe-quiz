@@ -1,12 +1,12 @@
 import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
-import "package:go_router/go_router.dart";
 
 import "../../../app/theme/spacing.dart";
 import "../../../core/network/api_error.dart";
 import "../../../shared/components/app_button.dart";
 import "../../../shared/components/app_card.dart";
 import "../service/student_account_service.dart";
+import "widgets/admin_layout.dart";
 
 class AdminStudentAccountManagementScreen extends ConsumerStatefulWidget {
   const AdminStudentAccountManagementScreen({super.key});
@@ -74,23 +74,27 @@ class _AdminStudentAccountManagementScreenState
     }
   }
 
-  Future<void> _deleteStudent(String studentId) async {
+  Future<void> _deleteStudent({
+    required String studentId,
+    required String username,
+  }) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text("Hapus akun siswa"),
-          content: const Text(
-            "Akun siswa beserta data ujian terkait akan terhapus. Lanjutkan?",
+          content: Text(
+            "Akun \"$username\" akan dihapus permanen.\n\n"
+            "Semua hasil ujian siswa ini juga akan ikut terhapus dan tidak bisa dikembalikan. Lanjutkan?",
           ),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text("Batal"),
             ),
-            TextButton(
+            FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text("Hapus"),
+              child: const Text("Ya, Hapus"),
             ),
           ],
         );
@@ -135,131 +139,129 @@ class _AdminStudentAccountManagementScreenState
   Widget build(BuildContext context) {
     final studentsAsync = ref.watch(studentAccountsProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text("Student Account Management")),
-      body: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            AppCard(
-              title: "Buat Akun Siswa",
-              subtitle: "Admin menyiapkan username dan password peserta ujian.",
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    TextFormField(
-                      controller: _usernameController,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: "Username siswa",
-                        hintText: "contoh: siswa01",
-                      ),
-                      validator: (value) {
-                        final text = value?.trim() ?? "";
-                        if (text.isEmpty) {
-                          return "Username wajib diisi";
-                        }
-                        if (text.length < 3) {
-                          return "Username minimal 3 karakter";
-                        }
-                        return null;
-                      },
+    return AdminLayout(
+      title: "Kelola Akun Siswa",
+      subtitle: "Tambah, hapus, dan cek akun peserta ujian.",
+      activeSection: AdminSection.students,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          AppCard(
+            title: "Buat Akun Siswa",
+            subtitle: "Admin menyiapkan username dan password peserta ujian.",
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  TextFormField(
+                    controller: _usernameController,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: "Username siswa",
+                      hintText: "contoh: siswa01",
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: "Password",
-                        hintText: "Minimal 6 karakter",
-                      ),
-                      validator: (value) {
-                        final text = value ?? "";
-                        if (text.isEmpty) {
-                          return "Password wajib diisi";
-                        }
-                        if (text.length < 6) {
-                          return "Password minimal 6 karakter";
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    AppButton(
-                      label: "Buat Akun Siswa",
-                      loading: _isCreating,
-                      onPressed: _createStudent,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: <Widget>[
-                Text(
-                  "Daftar Akun Siswa",
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                TextButton(
-                  onPressed: () => ref.invalidate(studentAccountsProvider),
-                  child: const Text("Segarkan"),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Expanded(
-              child: studentsAsync.when(
-                data: (students) {
-                  if (students.isEmpty) {
-                    return const AppCard(
-                      title: "Belum ada akun siswa",
-                      subtitle: "Tambahkan akun siswa untuk bisa login ujian.",
-                    );
-                  }
-
-                  return ListView.separated(
-                    itemCount: students.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (context, index) {
-                      final item = students[index];
-                      final deleting = _deletingStudentId == item.id;
-                      return AppCard(
-                        title: item.username,
-                        subtitle: "Role: ${item.role}",
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: AppButton(
-                            label: "Hapus",
-                            variant: AppButtonVariant.secondary,
-                            loading: deleting,
-                            onPressed:
-                                deleting ? null : () => _deleteStudent(item.id),
-                          ),
-                        ),
-                      );
+                    validator: (value) {
+                      final text = value?.trim() ?? "";
+                      if (text.isEmpty) {
+                        return "Username wajib diisi";
+                      }
+                      if (text.length < 3) {
+                        return "Username minimal 3 karakter";
+                      }
+                      return null;
                     },
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, _) => AppCard(
-                  title: "Gagal memuat akun siswa",
-                  subtitle: error.toString(),
-                ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: "Kata Sandi",
+                      hintText: "Minimal 6 karakter",
+                    ),
+                    validator: (value) {
+                      final text = value ?? "";
+                      if (text.isEmpty) {
+                        return "Kata sandi wajib diisi";
+                      }
+                      if (text.length < 6) {
+                        return "Kata sandi minimal 6 karakter";
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  AppButton(
+                    label: "Buat Akun Siswa",
+                    loading: _isCreating,
+                    onPressed: _createStudent,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            AppButton(
-              label: "Kembali ke Dashboard",
-              onPressed: () => context.go("/admin/dashboard"),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Text(
+                "Daftar Akun Siswa",
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              TextButton(
+                onPressed: () => ref.invalidate(studentAccountsProvider),
+                child: const Text("Segarkan"),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Expanded(
+            child: studentsAsync.when(
+              data: (students) {
+                if (students.isEmpty) {
+                  return const AppCard(
+                    title: "Belum ada akun siswa",
+                    subtitle: "Tambahkan akun siswa untuk bisa login ujian.",
+                  );
+                }
+
+                return ListView.separated(
+                  itemCount: students.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: AppSpacing.sm),
+                  itemBuilder: (context, index) {
+                    final item = students[index];
+                    final deleting = _deletingStudentId == item.id;
+                    return AppCard(
+                      title: item.username,
+                      subtitle: "Peran: ${item.role}",
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: AppButton(
+                          label: "Hapus",
+                          variant: AppButtonVariant.secondary,
+                          loading: deleting,
+                          onPressed: deleting
+                              ? null
+                              : () => _deleteStudent(
+                                    studentId: item.id,
+                                    username: item.username,
+                                  ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => AppCard(
+                title: "Gagal memuat akun siswa",
+                subtitle: error.toString(),
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
