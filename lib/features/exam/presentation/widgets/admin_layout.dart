@@ -93,14 +93,7 @@ class AdminLayout extends ConsumerWidget {
       return Scaffold(
         appBar: AppBar(
           title: Text(title),
-          actions: <Widget>[
-            ...actions,
-            IconButton(
-              tooltip: 'Keluar',
-              onPressed: logout,
-              icon: const Icon(Icons.logout),
-            ),
-          ],
+          actions: actions,
         ),
         drawer: Drawer(
           child: SafeArea(
@@ -145,7 +138,6 @@ class AdminLayout extends ConsumerWidget {
                     title: title,
                     subtitle: subtitle,
                     actions: actions,
-                    onLogout: logout,
                   ),
                   Expanded(
                     child: Padding(
@@ -167,14 +159,12 @@ class _DesktopHeader extends StatelessWidget {
   const _DesktopHeader({
     required this.title,
     required this.actions,
-    required this.onLogout,
     this.subtitle,
   });
 
   final String title;
   final String? subtitle;
   final List<Widget> actions;
-  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -238,11 +228,6 @@ class _DesktopHeader extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.sm),
           ...actions,
-          IconButton(
-            tooltip: 'Keluar',
-            onPressed: onLogout,
-            icon: const Icon(Icons.logout),
-          ),
         ],
       ),
     );

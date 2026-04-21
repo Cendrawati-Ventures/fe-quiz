@@ -11,6 +11,12 @@ class ApiError implements Exception {
     final responseData = error.response?.data;
 
     if (responseData is Map<String, dynamic>) {
+      final fieldErrorMessage =
+          _friendlyFromFieldErrors(responseData['details']);
+      if (fieldErrorMessage != null) {
+        return ApiError(message: fieldErrorMessage, statusCode: statusCode);
+      }
+
       final dynamic apiMessage = responseData['message'];
       if (apiMessage is String && apiMessage.isNotEmpty) {
         return ApiError(
@@ -134,6 +140,97 @@ class ApiError implements Exception {
     return message.trim().isEmpty
         ? _fallbackByStatus(statusCode)
         : message.trim();
+  }
+
+  static String? _friendlyFromFieldErrors(dynamic details) {
+    if (details is! Map<String, dynamic>) {
+      return null;
+    }
+    final fieldErrors = details['fieldErrors'];
+    if (fieldErrors is! Map) {
+      return null;
+    }
+
+    final messages = <String>[];
+    for (final entry in fieldErrors.entries) {
+      final fieldName = entry.key?.toString();
+      if (fieldName == null || fieldName.isEmpty) {
+        continue;
+      }
+      final validationMessage = _firstValidationMessage(entry.value);
+      if (validationMessage == null || validationMessage.isEmpty) {
+        continue;
+      }
+      messages.add(
+        '${_fieldLabel(fieldName)} ${_translateValidationMessage(validationMessage)}',
+      );
+    }
+
+    if (messages.isEmpty) {
+      return null;
+    }
+    return messages.join(' ');
+  }
+
+  static String? _firstValidationMessage(dynamic value) {
+    if (value is List) {
+      for (final item in value) {
+        if (item is String && item.trim().isNotEmpty) {
+          return item.trim();
+        }
+      }
+      return null;
+    }
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+    return null;
+  }
+
+  static String _fieldLabel(String fieldName) {
+    switch (fieldName) {
+      case 'username':
+        return 'Username';
+      case 'password':
+        return 'Kata sandi';
+      case 'displayName':
+        return 'Nama tampilan';
+      case 'fullName':
+        return 'Nama lengkap';
+      case 'rollNumber':
+        return 'No absen';
+      default:
+        return fieldName;
+    }
+  }
+
+  static String _translateValidationMessage(String message) {
+    final normalized = message.toLowerCase();
+    final atLeastMatch = RegExp(r'at least (\d+)').firstMatch(normalized);
+    if (atLeastMatch != null) {
+      final minimum = atLeastMatch.group(1);
+      if (minimum != null) {
+        return 'minimal $minimum karakter.';
+      }
+    }
+
+    final atMostMatch = RegExp(r'at most (\d+)').firstMatch(normalized);
+    if (atMostMatch != null) {
+      final maximum = atMostMatch.group(1);
+      if (maximum != null) {
+        return 'maksimal $maximum karakter.';
+      }
+    }
+
+    if (normalized.contains('required')) {
+      return 'wajib diisi.';
+    }
+
+    if (normalized.contains('invalid')) {
+      return 'tidak valid.';
+    }
+
+    return message.endsWith('.') ? message : '$message.';
   }
 
   static String _fallbackByStatus(int? statusCode) {

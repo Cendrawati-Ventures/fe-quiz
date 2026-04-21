@@ -89,13 +89,17 @@ class ApiClient {
     if (kDebugMode) {
       _dio.interceptors.add(
         PrettyDioLogger(
-          requestHeader: true,
+          requestHeader: false,
           requestBody: true,
           responseHeader: false,
           responseBody: true,
           error: true,
           compact: true,
           maxWidth: 120,
+          filter: (options, _) {
+            final path = _normalizePath(options.path);
+            return path != '/auth/login';
+          },
         ),
       );
     }
@@ -151,10 +155,14 @@ class ApiClient {
   }
 
   void _logError(DioException error) {
+    final statusCode = error.response?.statusCode;
+    final isClientError =
+        statusCode != null && statusCode >= 400 && statusCode < 500;
+
     _logger.e(
       'Permintaan API gagal: ${error.requestOptions.method} ${error.requestOptions.uri}',
-      error: error.error ?? error.message,
-      stackTrace: error.stackTrace,
+      error: isClientError ? error.message : (error.error ?? error.message),
+      stackTrace: isClientError ? null : error.stackTrace,
     );
   }
 

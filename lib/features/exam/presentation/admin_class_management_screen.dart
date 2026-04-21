@@ -75,8 +75,9 @@ class AdminClassManagementScreen extends ConsumerWidget {
       return;
     }
 
-    final deleted =
-        await ref.read(adminClassActionProvider.notifier).deleteClass(classRoom.id);
+    final deleted = await ref
+        .read(adminClassActionProvider.notifier)
+        .deleteClass(classRoom.id);
     if (!context.mounted) {
       return;
     }
@@ -91,6 +92,34 @@ class AdminClassManagementScreen extends ConsumerWidget {
     AppSnackBar.error(context, message);
   }
 
+  Widget _buildResponsiveActionRow({
+    required Widget leading,
+    required Widget trailing,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 520) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              leading,
+              const SizedBox(height: AppSpacing.sm),
+              trailing,
+            ],
+          );
+        }
+
+        return Row(
+          children: <Widget>[
+            Expanded(child: leading),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: trailing),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final classesAsync = ref.watch(classListProvider);
@@ -103,7 +132,7 @@ class AdminClassManagementScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           AppButton(
-            label: 'Tambah Kelas',
+            label: 'Tambah Kelas Baru',
             onPressed: () => _showCreateClassDialog(context),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -113,56 +142,64 @@ class AdminClassManagementScreen extends ConsumerWidget {
                 if (classes.isEmpty) {
                   return const AppCard(
                     title: 'Belum ada kelas',
-                    subtitle: 'Buat kelas baru untuk mulai mengelola akses ujian.',
+                    subtitle:
+                        'Buat kelas baru untuk mulai mengelola akses ujian.',
                   );
                 }
 
                 return ListView.separated(
                   itemCount: classes.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: AppSpacing.sm),
                   itemBuilder: (context, index) {
                     final item = classes[index];
                     return AppCard(
                       title: item.name,
                       subtitle:
-                          'Siswa: ${item.studentCount} orang\nAkses ujian: ${item.subjectCount} ujian',
-                      child: Wrap(
-                        spacing: AppSpacing.sm,
-                        runSpacing: AppSpacing.sm,
+                          '${item.studentCount} siswa terdaftar | ${item.subjectCount} ujian dengan akses',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
-                          SizedBox(
-                            width: 170,
-                            child: AppButton(
-                              label: 'Atur Anggota',
+                          Text(
+                            'Aksi Utama',
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          _buildResponsiveActionRow(
+                            leading: AppButton(
+                              label: 'Kelola Anggota',
+                              onPressed: () => context
+                                  .go('/admin/classes/${item.id}/students'),
+                            ),
+                            trailing: AppButton(
+                              label: 'Kelola Akses Ujian',
                               variant: AppButtonVariant.secondary,
-                              onPressed: () =>
-                                  context.go('/admin/classes/${item.id}/students'),
+                              onPressed: () => context
+                                  .go('/admin/classes/${item.id}/subjects'),
                             ),
                           ),
-                          SizedBox(
-                            width: 210,
-                            child: AppButton(
-                              label: 'Atur Ujian',
-                              variant: AppButtonVariant.secondary,
-                              onPressed: () =>
-                                  context.go('/admin/classes/${item.id}/subjects'),
-                            ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Divider(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                            height: 1,
                           ),
-                          SizedBox(
-                            width: 140,
-                            child: AppButton(
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'Aksi Lanjutan',
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          _buildResponsiveActionRow(
+                            leading: AppButton(
                               label: 'Ubah Nama',
-                              variant: AppButtonVariant.secondary,
+                              variant: AppButtonVariant.ghost,
                               onPressed: () => _showRenameClassDialog(
                                 context,
                                 classRoom: item,
                               ),
                             ),
-                          ),
-                          SizedBox(
-                            width: 110,
-                            child: AppButton(
-                              label: 'Hapus',
+                            trailing: AppButton(
+                              label: 'Hapus Kelas',
                               variant: AppButtonVariant.danger,
                               onPressed: () => _showDeleteClassDialog(
                                 context,
@@ -225,8 +262,8 @@ class _CreateClassDialogState extends ConsumerState<_CreateClassDialog> {
       return;
     }
 
-    final message =
-        ref.read(adminClassActionProvider).errorMessage ?? 'Kelas gagal dibuat.';
+    final message = ref.read(adminClassActionProvider).errorMessage ??
+        'Kelas gagal dibuat.';
     AppSnackBar.error(context, message);
   }
 
@@ -309,10 +346,11 @@ class _RenameClassDialogState extends ConsumerState<_RenameClassDialog> {
       return;
     }
 
-    final updated = await ref.read(adminClassActionProvider.notifier).updateClass(
-          classId: widget.classRoom.id,
-          name: _nameController.text.trim(),
-        );
+    final updated =
+        await ref.read(adminClassActionProvider.notifier).updateClass(
+              classId: widget.classRoom.id,
+              name: _nameController.text.trim(),
+            );
 
     if (!mounted) {
       return;

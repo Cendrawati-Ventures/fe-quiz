@@ -510,4 +510,15 @@ class ExamService {
       throw ApiError.fromDioException(error);
     }
   }
+
+  Future<void> deleteAdminResult(String resultId) async {
+    try {
+      await _dio.delete<dynamic>(
+        '/results/$resultId',
+        options: _writeOptions(),
+      );
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
 }

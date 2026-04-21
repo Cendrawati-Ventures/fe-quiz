@@ -117,11 +117,12 @@ class _AdminClassStudentAssignmentScreenState
   }
 
   Future<void> _saveAssignments() async {
-    final detail =
-        await ref.read(adminClassActionProvider.notifier).saveStudentAssignments(
-              classId: widget.classId,
-              studentIds: _selectedStudentIds.toList(),
-            );
+    final detail = await ref
+        .read(adminClassActionProvider.notifier)
+        .saveStudentAssignments(
+          classId: widget.classId,
+          studentIds: _selectedStudentIds.toList(),
+        );
 
     if (!mounted) {
       return;
@@ -145,18 +146,15 @@ class _AdminClassStudentAssignmentScreenState
     final detailAsync = ref.watch(classDetailProvider(widget.classId));
     final studentsAsync = ref.watch(studentAccountsProvider);
     final actionState = ref.watch(adminClassActionProvider);
+    final topSectionMaxHeight = (MediaQuery.sizeOf(context).height * 0.32)
+        .clamp(120.0, 260.0)
+        .toDouble();
 
     return AdminLayout(
       title: 'Atur Anggota Kelas',
       subtitle:
           'Pilih siswa untuk kelas ini. Gunakan pencarian dan filter saat data besar.',
       activeSection: AdminSection.classes,
-      actions: <Widget>[
-        OutlinedButton(
-          onPressed: () => context.go('/admin/classes'),
-          child: const Text('Kembali'),
-        ),
-      ],
       child: detailAsync.when(
         data: (detail) {
           _initializeSelection(detail.studentIds);
@@ -168,89 +166,96 @@ class _AdminClassStudentAssignmentScreenState
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  AppCard(
-                    title: 'Kelas: ${detail.name}',
-                    subtitle:
-                        '${_selectedStudentIds.length} siswa dipilih dari ${students.length} total siswa.',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        TextField(
-                          controller: _searchController,
-                          decoration: const InputDecoration(
-                            labelText: 'Cari siswa',
-                            hintText:
-                                'Cari berdasarkan nama, username, no absen, atau kelas',
-                            prefixIcon: Icon(Icons.search_rounded),
-                          ),
-                          onChanged: (value) {
-                            setState(() {
-                              _query = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Wrap(
-                          spacing: AppSpacing.xs,
-                          runSpacing: AppSpacing.xs,
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: topSectionMaxHeight),
+                    child: SingleChildScrollView(
+                      primary: false,
+                      child: AppCard(
+                        title: 'Kelas: ${detail.name}',
+                        subtitle:
+                            '${_selectedStudentIds.length} siswa dipilih dari ${students.length} total siswa.',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
-                            ChoiceChip(
-                              label: const Text('Semua'),
-                              selected: _filter == _StudentFilter.all,
-                              onSelected: (_) {
+                            TextField(
+                              controller: _searchController,
+                              decoration: const InputDecoration(
+                                labelText: 'Cari siswa',
+                                hintText:
+                                    'Cari berdasarkan nama, username, no absen, atau kelas',
+                                prefixIcon: Icon(Icons.search_rounded),
+                              ),
+                              onChanged: (value) {
                                 setState(() {
-                                  _filter = _StudentFilter.all;
+                                  _query = value;
                                 });
                               },
                             ),
-                            ChoiceChip(
-                              label: const Text('Terpilih'),
-                              selected: _filter == _StudentFilter.selected,
-                              onSelected: (_) {
-                                setState(() {
-                                  _filter = _StudentFilter.selected;
-                                });
-                              },
+                            const SizedBox(height: AppSpacing.sm),
+                            Wrap(
+                              spacing: AppSpacing.xs,
+                              runSpacing: AppSpacing.xs,
+                              children: <Widget>[
+                                ChoiceChip(
+                                  label: const Text('Semua'),
+                                  selected: _filter == _StudentFilter.all,
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _filter = _StudentFilter.all;
+                                    });
+                                  },
+                                ),
+                                ChoiceChip(
+                                  label: const Text('Terpilih'),
+                                  selected: _filter == _StudentFilter.selected,
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _filter = _StudentFilter.selected;
+                                    });
+                                  },
+                                ),
+                                ChoiceChip(
+                                  label: const Text('Belum Dipilih'),
+                                  selected:
+                                      _filter == _StudentFilter.unselected,
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _filter = _StudentFilter.unselected;
+                                    });
+                                  },
+                                ),
+                              ],
                             ),
-                            ChoiceChip(
-                              label: const Text('Belum Dipilih'),
-                              selected: _filter == _StudentFilter.unselected,
-                              onSelected: (_) {
-                                setState(() {
-                                  _filter = _StudentFilter.unselected;
-                                });
-                              },
+                            const SizedBox(height: AppSpacing.sm),
+                            Wrap(
+                              spacing: AppSpacing.sm,
+                              runSpacing: AppSpacing.sm,
+                              children: <Widget>[
+                                SizedBox(
+                                  width: 200,
+                                  child: AppButton(
+                                    label: 'Pilih Semua Hasil',
+                                    variant: AppButtonVariant.secondary,
+                                    onPressed: filteredStudents.isEmpty
+                                        ? null
+                                        : () => _selectAll(filteredStudents),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: 200,
+                                  child: AppButton(
+                                    label: 'Kosongkan Hasil',
+                                    variant: AppButtonVariant.ghost,
+                                    onPressed: filteredStudents.isEmpty
+                                        ? null
+                                        : () => _clearAll(filteredStudents),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Wrap(
-                          spacing: AppSpacing.sm,
-                          runSpacing: AppSpacing.sm,
-                          children: <Widget>[
-                            SizedBox(
-                              width: 200,
-                              child: AppButton(
-                                label: 'Pilih Semua Hasil',
-                                variant: AppButtonVariant.secondary,
-                                onPressed: filteredStudents.isEmpty
-                                    ? null
-                                    : () => _selectAll(filteredStudents),
-                              ),
-                            ),
-                            SizedBox(
-                              width: 200,
-                              child: AppButton(
-                                label: 'Kosongkan Hasil',
-                                variant: AppButtonVariant.ghost,
-                                onPressed: filteredStudents.isEmpty
-                                    ? null
-                                    : () => _clearAll(filteredStudents),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -288,8 +293,8 @@ class _AdminClassStudentAssignmentScreenState
                                     itemCount: filteredStudents.length,
                                     itemBuilder: (context, index) {
                                       final student = filteredStudents[index];
-                                      final selected =
-                                          _selectedStudentIds.contains(student.id);
+                                      final selected = _selectedStudentIds
+                                          .contains(student.id);
                                       final fullName =
                                           student.fullName?.trim().isNotEmpty ==
                                                   true
