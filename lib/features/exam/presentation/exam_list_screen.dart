@@ -93,8 +93,7 @@ class ExamListScreen extends ConsumerStatefulWidget {
 class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   bool _identityPromptScheduled = false;
   bool _isIdentityDialogOpen = false;
-  String? _selectedSubjectId;
-  bool _isStartingExam = false;
+  String? _startingSubjectId;
   bool _hasTriggeredInitialRefresh = false;
 
   @override
@@ -128,7 +127,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
 
     return StudentLayout(
       title: 'Daftar Ujian',
-      subtitle: 'Pilih ujian yang aktif sesuai kelas kamu.',
+      subtitle: 'Mulai ujian langsung dari card yang tersedia.',
       activeSection: StudentSection.exams,
       contentPadding: EdgeInsets.zero,
       child: RefreshIndicator(
@@ -220,24 +219,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
       );
     }
 
-    final selectedSubjectId = _resolveSubjectId(subjects);
-    final selectedSubject =
-        subjects.firstWhere((item) => item.id == selectedSubjectId);
-
-    final selectedStat = stats[selectedSubject.id] ??
-        const _SubjectQuestionStat(questionCount: 0, totalWeight: 0);
-    final selectedAttempts = _attemptCount(
-      results: results,
-      subject: selectedSubject,
-    );
-
-    final canStart = _canStartSubject(
-      isIdentityReady: identity.isReadyForExam,
-      attemptsUsed: selectedAttempts,
-      attemptLimit: selectedSubject.attemptLimit,
-      stat: selectedStat,
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -259,7 +240,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  _sectionTag('LANGKAH 1'),
+                  _sectionTag('UJIAN AKTIF'),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     'Selamat datang, ${identity.name.trim().isEmpty ? (user?.username ?? 'siswa') : identity.name}',
@@ -270,7 +251,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Pilih ujian yang ingin kamu kerjakan dan baca ringkasannya sebelum menekan Mulai Ujian.',
+                    'Tekan tombol Mulai pada card ujian yang ingin kamu kerjakan. Setiap mulai ujian akan dikonfirmasi dulu.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFF6C624F),
                         ),
@@ -285,51 +266,23 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   if (isCompact)
-                    _buildMobileSubjectList(
+                    _buildExamCards(
                       isIdentityReady: identity.isReadyForExam,
+                      hasAssignedClass: identity.hasAssignedClass,
+                      isCompact: isCompact,
                       subjects: subjects,
-                      selectedSubjectId: selectedSubjectId,
                       results: results,
                       stats: stats,
                     )
                   else
-                    _buildDesktopSubjectTable(
+                    _buildExamCards(
                       isIdentityReady: identity.isReadyForExam,
+                      hasAssignedClass: identity.hasAssignedClass,
+                      isCompact: isCompact,
                       subjects: subjects,
-                      selectedSubjectId: selectedSubjectId,
                       results: results,
                       stats: stats,
                     ),
-                  const SizedBox(height: AppSpacing.sm),
-                  _buildSelectedSubjectPills(
-                    subject: selectedSubject,
-                    stat: selectedStat,
-                    attemptsUsed: selectedAttempts,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  AppButton(
-                    label: 'Mulai Ujian',
-                    loading: _isStartingExam,
-                    disabled: !canStart,
-                    onPressed: () => _startExam(
-                      subject: selectedSubject,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    _subjectStatusText(
-                      isIdentityReady: identity.isReadyForExam,
-                      hasAssignedClass: identity.hasAssignedClass,
-                      subject: selectedSubject,
-                      stat: selectedStat,
-                      attemptsUsed: selectedAttempts,
-                    ),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: canStart
-                              ? const Color(0xFF1B7A42)
-                              : const Color(0xFF8A3F28),
-                        ),
-                  ),
                   const SizedBox(height: AppSpacing.md),
                   OutlinedButton.icon(
                     onPressed: () => context.go('/result'),
@@ -472,232 +425,225 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     );
   }
 
-  Widget _buildDesktopSubjectTable({
+  Widget _buildExamCards({
     required bool isIdentityReady,
+    required bool hasAssignedClass,
+    required bool isCompact,
     required List<ApiSubject> subjects,
-    required String selectedSubjectId,
     required List<ResultResponse> results,
     required Map<String, _SubjectQuestionStat> stats,
   }) {
-    final theme = Theme.of(context);
-    final headerStyle = theme.textTheme.labelLarge?.copyWith(
-      color: const Color(0xFF3F341F),
-      fontWeight: FontWeight.w700,
-    );
+    final cards = subjects.map((subject) {
+      final stat = stats[subject.id] ??
+          const _SubjectQuestionStat(questionCount: 0, totalWeight: 0);
+      final attempts = _attemptCount(
+        results: results,
+        subject: subject,
+      );
+      final canStart = _canStartSubject(
+        isIdentityReady: isIdentityReady,
+        attemptsUsed: attempts,
+        attemptLimit: subject.attemptLimit,
+        stat: stat,
+      );
+      final statusText = _subjectStatusText(
+        isIdentityReady: isIdentityReady,
+        hasAssignedClass: hasAssignedClass,
+        subject: subject,
+        stat: stat,
+        attemptsUsed: attempts,
+      );
+      final isStarting = _startingSubjectId == subject.id;
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFC9D2BF)),
-      ),
-      child: Column(
-        children: <Widget>[
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: AppSpacing.sm,
-            ),
-            decoration: const BoxDecoration(
-              color: Color(0xFFE4E9D7),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
-            ),
-            child: Row(
-              children: <Widget>[
-                Expanded(flex: 17, child: Text('Ujian', style: headerStyle)),
-                Expanded(flex: 9, child: Text('Durasi', style: headerStyle)),
-                Expanded(
-                  flex: 13,
-                  child: Text('Batas Pengulangan', style: headerStyle),
-                ),
-                Expanded(
-                    flex: 12,
-                    child: Text('Pengerjaan Saya', style: headerStyle)),
-                Expanded(
-                    flex: 10, child: Text('Soal Tersedia', style: headerStyle)),
-                Expanded(
-                    flex: 12, child: Text('Bobot Soal', style: headerStyle)),
-                Expanded(flex: 10, child: Text('Aksi', style: headerStyle)),
-              ],
-            ),
-          ),
-          ...subjects.map((subject) {
-            final stat = stats[subject.id] ??
-                const _SubjectQuestionStat(questionCount: 0, totalWeight: 0);
-            final attempts = _attemptCount(
-              results: results,
-              subject: subject,
-            );
-            final isSelected = subject.id == selectedSubjectId;
-            final canStart = _canStartSubject(
-              isIdentityReady: isIdentityReady,
-              attemptsUsed: attempts,
-              attemptLimit: subject.attemptLimit,
-              stat: stat,
-            );
+      return _buildExamCard(
+        subject: subject,
+        stat: stat,
+        attemptsUsed: attempts,
+        canStart: canStart,
+        statusText: statusText,
+        isStarting: isStarting,
+      );
+    }).toList();
 
-            return Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: AppSpacing.sm,
+    if (isCompact) {
+      return Column(
+        children: cards
+            .map(
+              (card) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: card,
               ),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? const Color(0xFFF1E5CC)
-                    : const Color(0xFFF9F8F2),
-                border: const Border(
-                  top: BorderSide(color: Color(0xFFD8DFCE)),
-                ),
-              ),
-              child: Row(
-                children: <Widget>[
-                  Expanded(flex: 17, child: Text(subject.name)),
-                  Expanded(
-                    flex: 9,
-                    child: Text('${subject.durationMinutes} menit'),
-                  ),
-                  Expanded(flex: 13, child: Text('${subject.attemptLimit}x')),
-                  Expanded(
-                    flex: 12,
-                    child: Text('$attempts/${subject.attemptLimit}'),
-                  ),
-                  Expanded(flex: 10, child: Text('${stat.questionCount}')),
-                  Expanded(
-                    flex: 12,
-                    child: Text('${_formatWeight(stat.totalWeight)}/100'),
-                  ),
-                  Expanded(
-                    flex: 10,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: FilledButton(
-                        onPressed: () {
-                          setState(() {
-                            _selectedSubjectId = subject.id;
-                          });
-                        },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: canStart
-                              ? const Color(0xFF16A34A)
-                              : const Color(0xFF9CA3AF),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: AppSpacing.xs,
-                          ),
-                        ),
-                        child: const Text('Pilih'),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
+            )
+            .toList(),
+      );
+    }
+
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: cards
+          .map(
+            (card) => SizedBox(
+              width: 460,
+              child: card,
+            ),
+          )
+          .toList(),
     );
   }
 
-  Widget _buildMobileSubjectList({
-    required bool isIdentityReady,
-    required List<ApiSubject> subjects,
-    required String selectedSubjectId,
-    required List<ResultResponse> results,
-    required Map<String, _SubjectQuestionStat> stats,
-  }) {
-    return Column(
-      children: subjects.map((subject) {
-        final stat = stats[subject.id] ??
-            const _SubjectQuestionStat(questionCount: 0, totalWeight: 0);
-        final attempts = _attemptCount(
-          results: results,
-          subject: subject,
-        );
-        final selected = subject.id == selectedSubjectId;
-        final canStart = _canStartSubject(
-          isIdentityReady: isIdentityReady,
-          attemptsUsed: attempts,
-          attemptLimit: subject.attemptLimit,
-          stat: stat,
-        );
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color:
-                  selected ? const Color(0xFF95CAA9) : const Color(0xFFC9D2BF),
-            ),
-            color: selected ? const Color(0xFFF1E5CC) : const Color(0xFFF9F8F2),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      subject.name,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                  ),
-                  FilledButton(
-                    onPressed: () {
-                      setState(() {
-                        _selectedSubjectId = subject.id;
-                      });
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: canStart
-                          ? const Color(0xFF16A34A)
-                          : const Color(0xFF9CA3AF),
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Pilih'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Durasi: ${subject.durationMinutes} menit - Batas: ${subject.attemptLimit}x',
-              ),
-              Text('Pengerjaan: $attempts/${subject.attemptLimit}'),
-              Text('Soal tersedia: ${stat.questionCount}'),
-              Text('Bobot: ${_formatWeight(stat.totalWeight)}/100'),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildSelectedSubjectPills({
+  Widget _buildExamCard({
     required ApiSubject subject,
     required _SubjectQuestionStat stat,
     required int attemptsUsed,
+    required bool canStart,
+    required String statusText,
+    required bool isStarting,
   }) {
+    final cardColor =
+        canStart ? const Color(0xFFEFF9F0) : const Color(0xFFFFF4F1);
+    final borderColor =
+        canStart ? const Color(0xFFA7D5B4) : const Color(0xFFE2B8AE);
+    final tagColor =
+        canStart ? const Color(0xFF1F8A4C) : const Color(0xFF9C3D2E);
+    final buttonColor =
+        canStart ? const Color(0xFF168B4B) : const Color(0xFF9CA3AF);
+
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: const Color(0xFFE8EDF6),
-        border: Border.all(color: const Color(0xFFBDD0F5)),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor),
+        color: cardColor,
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x11000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
-      child: Wrap(
-        spacing: AppSpacing.xs,
-        runSpacing: AppSpacing.xs,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _InfoPill(label: subject.name, background: const Color(0xFFE8D9BC)),
-          _InfoPill(label: '${subject.durationMinutes} menit'),
-          _InfoPill(label: 'Batas ${subject.attemptLimit}x'),
-          _InfoPill(label: 'Percobaan $attemptsUsed/${subject.attemptLimit}'),
-          _InfoPill(label: 'Soal ${stat.questionCount}'),
-          _InfoPill(label: 'Bobot ${_formatWeight(stat.totalWeight)}/100'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  subject.name,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF2F2B1F),
+                      ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _StatusTag(
+                label: canStart ? 'Siap Dimulai' : 'Belum Siap',
+                background: tagColor,
+              ),
+            ],
+          ),
+          if (subject.description.trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              subject.description.trim(),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF5D5744),
+                  ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: <Widget>[
+              _InfoPill(label: '${subject.durationMinutes} menit'),
+              _InfoPill(label: 'Batas ${subject.attemptLimit}x'),
+              _InfoPill(
+                  label: 'Percobaan $attemptsUsed/${subject.attemptLimit}'),
+              _InfoPill(label: 'Soal ${stat.questionCount}'),
+              _InfoPill(label: 'Bobot ${_formatWeight(stat.totalWeight)}/100'),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+              border: Border.all(
+                color: canStart
+                    ? const Color(0xFFB8DCC3)
+                    : const Color(0xFFE9CCC6),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Jadwal Ujian',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF4A4637),
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _subjectScheduleText(subject),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF6E6754),
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  statusText,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: canStart
+                            ? const Color(0xFF19693A)
+                            : const Color(0xFF8A3F28),
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: !canStart || _startingSubjectId != null
+                  ? null
+                  : () => _confirmStartExam(
+                        subject: subject,
+                        stat: stat,
+                        attemptsUsed: attemptsUsed,
+                      ),
+              style: FilledButton.styleFrom(
+                backgroundColor: buttonColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: isStarting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.play_arrow_rounded),
+              label: Text(isStarting ? 'Memulai...' : 'Mulai Ujian'),
+            ),
+          ),
         ],
       ),
     );
@@ -810,18 +756,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     } catch (_) {}
   }
 
-  String _resolveSubjectId(List<ApiSubject> subjects) {
-    final selectedId = _selectedSubjectId;
-    if (selectedId != null) {
-      for (final item in subjects) {
-        if (item.id == selectedId) {
-          return selectedId;
-        }
-      }
-    }
-    return subjects.first.id;
-  }
-
   int _attemptCount({
     required List<ResultResponse> results,
     required ApiSubject subject,
@@ -879,7 +813,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     if ((stat.totalWeight - 100).abs() >= 0.001) {
       return 'Bobot soal ${subject.name} baru ${_formatWeight(stat.totalWeight)}/100. Hubungi guru/admin.';
     }
-    return 'Ujian ${subject.name} siap. Percobaan kamu $attemptsUsed/${subject.attemptLimit}. Tekan Mulai Ujian saat siap.';
+    return 'Ujian ${subject.name} siap. Tekan tombol Mulai pada card ini untuk memulai percobaan berikutnya.';
   }
 
   String _formatWeight(num value) {
@@ -928,10 +862,86 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     return value?.trim() ?? '';
   }
 
+  String _subjectScheduleText(ApiSubject subject) {
+    final publishAt = subject.publishAt;
+    final closeAt = subject.closeAt;
+    if (publishAt == null && closeAt == null) {
+      return 'Terbuka sepanjang waktu.';
+    }
+    if (publishAt != null && closeAt != null) {
+      return '${_formatDateTime(publishAt)} - ${_formatDateTime(closeAt)}';
+    }
+    if (publishAt != null) {
+      return 'Mulai ${_formatDateTime(publishAt)}';
+    }
+    return 'Tutup ${_formatDateTime(closeAt!)}';
+  }
+
+  String _formatDateTime(DateTime value) {
+    final local = value.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$day/$month/${local.year} $hour:$minute';
+  }
+
+  Future<void> _confirmStartExam({
+    required ApiSubject subject,
+    required _SubjectQuestionStat stat,
+    required int attemptsUsed,
+  }) async {
+    if (_startingSubjectId != null) {
+      return;
+    }
+
+    final attemptNumber = attemptsUsed + 1;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Konfirmasi Mulai Ujian'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('Ujian: ${subject.name}'),
+              const SizedBox(height: AppSpacing.xs),
+              Text('Durasi: ${subject.durationMinutes} menit'),
+              Text('Percobaan: $attemptNumber dari ${subject.attemptLimit}'),
+              Text('Jumlah soal: ${stat.questionCount}'),
+              Text('Bobot: ${_formatWeight(stat.totalWeight)}/100'),
+              const SizedBox(height: AppSpacing.sm),
+              const Text(
+                'Setelah dimulai, timer ujian langsung berjalan.',
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Ya, Mulai'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || confirmed != true) {
+      return;
+    }
+
+    await _startExam(subject: subject);
+  }
+
   Future<void> _startExam({
     required ApiSubject subject,
   }) async {
-    if (_isStartingExam) {
+    if (_startingSubjectId != null) {
       return;
     }
 
@@ -980,20 +990,24 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     }
 
     setState(() {
-      _isStartingExam = true;
+      _startingSubjectId = subject.id;
     });
 
-    await ref.read(examSessionProvider.notifier).startAttempt(
-          subject: subject,
-        );
+    try {
+      await ref.read(examSessionProvider.notifier).startAttempt(
+            subject: subject,
+          );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _startingSubjectId = null;
+        });
+      }
+    }
 
     if (!mounted) {
       return;
     }
-
-    setState(() {
-      _isStartingExam = false;
-    });
 
     final session = ref.read(examSessionProvider);
     if (session.hasActiveAttempt) {
@@ -1197,14 +1211,43 @@ class _StudentIdentityDialogState extends State<_StudentIdentityDialog> {
   }
 }
 
-class _InfoPill extends StatelessWidget {
-  const _InfoPill({
+class _StatusTag extends StatelessWidget {
+  const _StatusTag({
     required this.label,
-    this.background,
+    required this.background,
   });
 
   final String label;
-  final Color? background;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xxs,
+      ),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  const _InfoPill({
+    required this.label,
+  });
+
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -1215,7 +1258,7 @@ class _InfoPill extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        color: background ?? const Color(0xFF16A34A),
+        color: const Color(0xFF16A34A),
       ),
       child: Text(
         label,

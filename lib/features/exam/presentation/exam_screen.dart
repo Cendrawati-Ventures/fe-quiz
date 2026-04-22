@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 import '../../../app/theme/spacing.dart';
 import '../../../core/device/screen_security.dart';
@@ -23,8 +24,14 @@ class ExamScreen extends ConsumerStatefulWidget {
 }
 
 class _ExamScreenState extends ConsumerState<ExamScreen> {
+  static const String _backgroundMusicAsset = 'audio/default-music.wav';
+  static const double _backgroundMusicVolume = 0.28;
+
   bool _isSubmitFailureDialogVisible = false;
   BuildContext? _submitFailureDialogContext;
+  AudioPlayer? _backgroundMusicPlayer;
+  String? _playingAttemptId;
+  bool _isBackgroundMusicSyncing = false;
 
   @override
   void initState() {
@@ -35,6 +42,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   @override
   void dispose() {
     _dismissSubmitFailureDialog();
+    _disposeBackgroundMusic();
     _disableSecureFlag();
     super.dispose();
   }
@@ -42,10 +50,14 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen<ExamSessionState>(examSessionProvider, (previous, next) {
+      _syncBackgroundMusic(next);
+
       if (previous?.submitState != SubmitState.success &&
           next.submitState == SubmitState.success &&
           mounted) {
         _dismissSubmitFailureDialog();
+        _stopBackgroundMusic();
+        ref.invalidate(myResultsProvider);
         context.go('/result');
         return;
       }
@@ -66,6 +78,23 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     final question = state.currentQuestion;
     final totalQuestions = state.questions.length;
     final currentIndex = state.currentQuestionIndex;
+    _syncBackgroundMusic(state);
+
+    if (!state.hasActiveAttempt &&
+        state.submitState == SubmitState.success &&
+        state.latestResult != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        context.go('/result');
+      });
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     if (!state.hasActiveAttempt || question == null) {
       return Scaffold(
@@ -421,6 +450,74 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
   Future<void> _disableSecureFlag() async {
     await ScreenSecurity.disableSecureFlag();
+  }
+
+  void _syncBackgroundMusic(ExamSessionState state) {
+    final attempt = state.attempt;
+    if (!state.hasActiveAttempt || attempt == null) {
+      _stopBackgroundMusic();
+      return;
+    }
+
+    if (_playingAttemptId == attempt.id) {
+      return;
+    }
+
+    _startBackgroundMusic(attempt.id);
+  }
+
+  Future<void> _startBackgroundMusic(String attemptId) async {
+    if (_isBackgroundMusicSyncing) {
+      return;
+    }
+
+    _isBackgroundMusicSyncing = true;
+    try {
+      final player = _backgroundMusicPlayer ?? AudioPlayer();
+      _backgroundMusicPlayer = player;
+
+      await player.stop();
+      await player.setReleaseMode(ReleaseMode.loop);
+      await player.setVolume(_backgroundMusicVolume);
+      await player.play(AssetSource(_backgroundMusicAsset));
+
+      _playingAttemptId = attemptId;
+    } catch (_) {
+      _playingAttemptId = null;
+    } finally {
+      _isBackgroundMusicSyncing = false;
+    }
+  }
+
+  Future<void> _stopBackgroundMusic() async {
+    final player = _backgroundMusicPlayer;
+    _playingAttemptId = null;
+
+    if (player == null) {
+      return;
+    }
+
+    try {
+      await player.stop();
+    } catch (_) {}
+  }
+
+  Future<void> _disposeBackgroundMusic() async {
+    final player = _backgroundMusicPlayer;
+    _backgroundMusicPlayer = null;
+    _playingAttemptId = null;
+
+    if (player == null) {
+      return;
+    }
+
+    try {
+      await player.stop();
+    } catch (_) {}
+
+    try {
+      await player.dispose();
+    } catch (_) {}
   }
 
   Future<bool> _confirmSubmit(BuildContext context, int unansweredCount) async {
