@@ -9,6 +9,7 @@ import '../../auth/model/auth_user.dart';
 import '../../auth/state/auth_provider.dart';
 import '../model/exam_models.dart';
 import '../state/exam_state.dart';
+import 'widgets/student_layout.dart';
 
 class _StudentIdentity {
   const _StudentIdentity({
@@ -112,7 +113,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
-    final username = user?.username ?? 'siswa';
     final identity = _identityFromUser(user);
     final isSavingIdentity =
         authState.status == AuthStatus.authenticated && authState.isLoading;
@@ -126,42 +126,33 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
     final resultsAsync = ref.watch(myResultsProvider);
     final statsAsync = ref.watch(subjectQuestionStatsProvider);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFE1E7D0),
-      body: SafeArea(
-        child: Column(
+    return StudentLayout(
+      title: 'Daftar Ujian',
+      subtitle: 'Pilih ujian yang aktif sesuai kelas kamu.',
+      activeSection: StudentSection.exams,
+      contentPadding: EdgeInsets.zero,
+      child: RefreshIndicator(
+        onRefresh: _refreshAll,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.sm,
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.lg,
+          ),
           children: <Widget>[
-            _StudentTopBar(
-              username: username,
-              onLogout: _confirmLogout,
-            ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _refreshAll,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.sm,
-                    AppSpacing.md,
-                    AppSpacing.sm,
-                    AppSpacing.lg,
-                  ),
-                  children: <Widget>[
-                    Align(
-                      alignment: Alignment.topCenter,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 980),
-                        child: _buildBody(
-                          context: context,
-                          user: user,
-                          identity: identity,
-                          isSavingIdentity: isSavingIdentity,
-                          subjectsAsync: subjectsAsync,
-                          resultsAsync: resultsAsync,
-                          statsAsync: statsAsync,
-                        ),
-                      ),
-                    ),
-                  ],
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 980),
+                child: _buildBody(
+                  context: context,
+                  user: user,
+                  identity: identity,
+                  isSavingIdentity: isSavingIdentity,
+                  subjectsAsync: subjectsAsync,
+                  resultsAsync: resultsAsync,
+                  statsAsync: statsAsync,
                 ),
               ),
             ),
@@ -222,7 +213,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
           _buildCriticalErrorCard(
             title: 'Ujian belum tersedia',
             subtitle: identity.hasAssignedClass
-                ? 'Guru/admin belum menambahkan ujian. Hubungi admin untuk melengkapi data.'
+                ? 'Ujian untuk kelas kamu belum terbuka. Minta admin cek menu Kelas > Kelola Akses Ujian, pastikan soal sudah ada, dan jadwal publish masih aktif.'
                 : 'Kelas kamu belum ditetapkan admin, jadi daftar ujian belum bisa ditampilkan.',
           ),
         ],
@@ -512,8 +503,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
             ),
             child: Row(
               children: <Widget>[
-                Expanded(
-                    flex: 17, child: Text('Ujian', style: headerStyle)),
+                Expanded(flex: 17, child: Text('Ujian', style: headerStyle)),
                 Expanded(flex: 9, child: Text('Durasi', style: headerStyle)),
                 Expanded(
                   flex: 13,
@@ -1075,147 +1065,6 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
       _isIdentityDialogOpen = false;
     }
   }
-
-  void _confirmLogout() async {
-    final confirmed = await _showLogoutConfirmationDialog(
-      context,
-      roleLabel: 'siswa',
-    );
-    if (!mounted || !confirmed) {
-      return;
-    }
-    ref.read(authProvider.notifier).logout();
-  }
-}
-
-class _StudentTopBar extends StatelessWidget {
-  const _StudentTopBar({
-    required this.username,
-    required this.onLogout,
-  });
-
-  final String username;
-  final VoidCallback onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.sm,
-      ),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[Color(0xFF19743F), Color(0xFF0F6A39)],
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Color(0x22104F2A),
-            blurRadius: 14,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 760;
-          return Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            runSpacing: AppSpacing.sm,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: <Widget>[
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Container(
-                    width: compact ? 54 : 62,
-                    height: compact ? 54 : 62,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      color: Colors.white.withValues(alpha: 0.15),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: const Icon(
-                      Icons.school_rounded,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        'RUANG CERITA',
-                        style:
-                            Theme.of(context).textTheme.labelMedium?.copyWith(
-                                  color: const Color(0xFFD4F1D8),
-                                  letterSpacing: 3,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                      ),
-                      Text(
-                        'Mode Ujian Siswa',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      Text(
-                        'Belajar rapi, kerjakan ujian dengan tenang.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: const Color(0xFFE6F8E8),
-                            ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xs,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      color: Colors.white.withValues(alpha: 0.18),
-                    ),
-                    child: Text(
-                      username,
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  OutlinedButton(
-                    onPressed: onLogout,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white30),
-                    ),
-                    child: const Text('Logout'),
-                  ),
-                ],
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
 }
 
 class _StudentIdentityDialog extends StatefulWidget {
@@ -1346,33 +1195,6 @@ class _StudentIdentityDialogState extends State<_StudentIdentityDialog> {
       ),
     );
   }
-}
-
-Future<bool> _showLogoutConfirmationDialog(
-  BuildContext context, {
-  required String roleLabel,
-}) async {
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: const Text('Konfirmasi Keluar'),
-        content: Text('Apakah kamu yakin ingin keluar dari akun $roleLabel?'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Ya, Keluar'),
-          ),
-        ],
-      );
-    },
-  );
-
-  return result ?? false;
 }
 
 class _InfoPill extends StatelessWidget {
