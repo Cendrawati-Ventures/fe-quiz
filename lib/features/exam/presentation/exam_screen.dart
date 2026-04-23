@@ -1,7 +1,12 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 import '../../../app/theme/spacing.dart';
 import '../../../core/device/screen_security.dart';
@@ -26,12 +31,20 @@ class ExamScreen extends ConsumerStatefulWidget {
 class _ExamScreenState extends ConsumerState<ExamScreen> {
   static const String _backgroundMusicAsset = 'audio/default-music.wav';
   static const double _backgroundMusicVolume = 0.28;
+  static const Duration _audioChunkDuration = Duration(seconds: 30);
+  static const String _audioChunkMimeType = 'audio/wav';
 
   bool _isSubmitFailureDialogVisible = false;
   BuildContext? _submitFailureDialogContext;
   AudioPlayer? _backgroundMusicPlayer;
   String? _playingAttemptId;
   bool _isBackgroundMusicSyncing = false;
+  AudioRecorder? _audioRecorder;
+  Timer? _audioChunkTimer;
+  bool _isAudioCaptureTransitioning = false;
+  String? _audioCaptureAttemptId;
+  DateTime? _audioChunkStartedAt;
+  int _nextAudioChunkIndex = 0;
 
   @override
   void initState() {
@@ -42,6 +55,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   @override
   void dispose() {
     _dismissSubmitFailureDialog();
+    unawaited(_stopAudioCapture(uploadFinalChunk: true));
+    unawaited(_disposeAudioCapture());
     _disposeBackgroundMusic();
     _disableSecureFlag();
     super.dispose();
@@ -51,11 +66,13 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   Widget build(BuildContext context) {
     ref.listen<ExamSessionState>(examSessionProvider, (previous, next) {
       _syncBackgroundMusic(next);
+      _syncAudioCapture(next);
 
       if (previous?.submitState != SubmitState.success &&
           next.submitState == SubmitState.success &&
           mounted) {
         _dismissSubmitFailureDialog();
+        unawaited(_stopAudioCapture(uploadFinalChunk: true));
         _stopBackgroundMusic();
         ref.invalidate(myResultsProvider);
         context.go('/result');
@@ -79,6 +96,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     final totalQuestions = state.questions.length;
     final currentIndex = state.currentQuestionIndex;
     _syncBackgroundMusic(state);
+    _syncAudioCapture(state);
 
     if (!state.hasActiveAttempt &&
         state.submitState == SubmitState.success &&
@@ -157,6 +175,10 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         );
 
         if (confirmed == true && context.mounted) {
+          await _stopAudioCapture(uploadFinalChunk: true);
+          if (!context.mounted) {
+            return;
+          }
           context.go('/exam');
         }
       },
@@ -450,6 +472,214 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
   Future<void> _disableSecureFlag() async {
     await ScreenSecurity.disableSecureFlag();
+  }
+
+  void _syncAudioCapture(ExamSessionState state) {
+    final attempt = state.attempt;
+    final shouldCapture = state.hasActiveAttempt &&
+        attempt != null &&
+        state.submitState != SubmitState.submitting;
+
+    if (!shouldCapture) {
+      unawaited(_stopAudioCapture(uploadFinalChunk: true));
+      return;
+    }
+
+    if (_audioCaptureAttemptId == attempt.id) {
+      return;
+    }
+
+    unawaited(_restartAudioCaptureForAttempt(attempt.id));
+  }
+
+  Future<void> _restartAudioCaptureForAttempt(String attemptId) async {
+    if (_isAudioCaptureTransitioning) {
+      return;
+    }
+
+    _isAudioCaptureTransitioning = true;
+    try {
+      await _stopAudioCapture(uploadFinalChunk: true);
+      _audioCaptureAttemptId = attemptId;
+      _audioChunkStartedAt = null;
+      _nextAudioChunkIndex = 0;
+      await _startAudioChunkRecording();
+    } finally {
+      _isAudioCaptureTransitioning = false;
+    }
+  }
+
+  Future<void> _startAudioChunkRecording() async {
+    final attemptId = _audioCaptureAttemptId;
+    if (attemptId == null) {
+      return;
+    }
+
+    final recorder = _audioRecorder ?? AudioRecorder();
+    _audioRecorder = recorder;
+
+    try {
+      final hasPermission = await recorder.hasPermission();
+      if (!hasPermission) {
+        return;
+      }
+
+      if (_audioCaptureAttemptId != attemptId) {
+        return;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final filePath =
+          '${tempDir.path}${Platform.pathSeparator}attempt_${attemptId}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+      await recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: filePath,
+      );
+
+      _audioChunkStartedAt = DateTime.now().toUtc();
+      _audioChunkTimer?.cancel();
+      _audioChunkTimer = Timer(_audioChunkDuration, () {
+        unawaited(_rotateAudioChunk());
+      });
+    } catch (_) {
+      _audioChunkTimer?.cancel();
+      _audioChunkTimer = null;
+      _audioChunkStartedAt = null;
+    }
+  }
+
+  Future<void> _rotateAudioChunk() async {
+    final recorder = _audioRecorder;
+    final attemptId = _audioCaptureAttemptId;
+    if (recorder == null || attemptId == null) {
+      return;
+    }
+
+    try {
+      final isRecording = await recorder.isRecording();
+      if (!isRecording) {
+        return;
+      }
+
+      final startedAt = _audioChunkStartedAt ?? DateTime.now().toUtc();
+      final filePath = await recorder.stop();
+      final endedAt = DateTime.now().toUtc();
+      _audioChunkStartedAt = null;
+
+      if (filePath != null && filePath.trim().isNotEmpty) {
+        final chunkIndex = _nextAudioChunkIndex;
+        _nextAudioChunkIndex += 1;
+        unawaited(
+          _uploadAudioChunk(
+            attemptId: attemptId,
+            chunkIndex: chunkIndex,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            filePath: filePath,
+          ),
+        );
+      }
+    } catch (_) {
+      _audioChunkStartedAt = null;
+    }
+
+    if (_audioCaptureAttemptId == attemptId) {
+      await _startAudioChunkRecording();
+    }
+  }
+
+  Future<void> _stopAudioCapture({required bool uploadFinalChunk}) async {
+    _audioChunkTimer?.cancel();
+    _audioChunkTimer = null;
+
+    final recorder = _audioRecorder;
+    final attemptId = _audioCaptureAttemptId;
+    final startedAt = _audioChunkStartedAt;
+
+    _audioCaptureAttemptId = null;
+    _audioChunkStartedAt = null;
+
+    if (recorder == null || attemptId == null) {
+      return;
+    }
+
+    try {
+      final isRecording = await recorder.isRecording();
+      if (!isRecording) {
+        return;
+      }
+
+      final filePath = await recorder.stop();
+      if (!uploadFinalChunk || filePath == null || filePath.trim().isEmpty) {
+        return;
+      }
+
+      final endedAt = DateTime.now().toUtc();
+      final chunkIndex = _nextAudioChunkIndex;
+      _nextAudioChunkIndex += 1;
+
+      await _uploadAudioChunk(
+        attemptId: attemptId,
+        chunkIndex: chunkIndex,
+        startedAt: startedAt ?? endedAt,
+        endedAt: endedAt,
+        filePath: filePath,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _uploadAudioChunk({
+    required String attemptId,
+    required int chunkIndex,
+    required DateTime startedAt,
+    required DateTime endedAt,
+    required String filePath,
+  }) async {
+    final audioFile = File(filePath);
+    try {
+      if (!await audioFile.exists()) {
+        return;
+      }
+
+      await ref.read(examServiceProvider).uploadProctoringAudioChunk(
+            attemptId: attemptId,
+            chunkIndex: chunkIndex,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            filePath: filePath,
+            mimeType: _audioChunkMimeType,
+          );
+    } catch (_) {
+      // Rekaman audio bersifat best effort dan tidak boleh memblokir ujian.
+    } finally {
+      try {
+        if (await audioFile.exists()) {
+          await audioFile.delete();
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _disposeAudioCapture() async {
+    _audioChunkTimer?.cancel();
+    _audioChunkTimer = null;
+    _audioCaptureAttemptId = null;
+    _audioChunkStartedAt = null;
+
+    final recorder = _audioRecorder;
+    _audioRecorder = null;
+    if (recorder == null) {
+      return;
+    }
+
+    try {
+      await recorder.dispose();
+    } catch (_) {}
   }
 
   void _syncBackgroundMusic(ExamSessionState state) {

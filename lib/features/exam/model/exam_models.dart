@@ -603,6 +603,48 @@ class ProctoringResponse {
   }
 }
 
+class AttemptAudioChunk {
+  const AttemptAudioChunk({
+    required this.id,
+    required this.attemptId,
+    required this.chunkIndex,
+    required this.mimeType,
+    required this.byteSize,
+    required this.startedAt,
+    required this.endedAt,
+    required this.createdAt,
+    required this.fileUrl,
+  });
+
+  final String id;
+  final String attemptId;
+  final int chunkIndex;
+  final String mimeType;
+  final int byteSize;
+  final DateTime? startedAt;
+  final DateTime? endedAt;
+  final DateTime createdAt;
+  final String fileUrl;
+
+  factory AttemptAudioChunk.fromJson(Map<String, dynamic> json) {
+    return AttemptAudioChunk(
+      id: json['id'] as String,
+      attemptId: json['attemptId'] as String,
+      chunkIndex: (json['chunkIndex'] as num? ?? 0).toInt(),
+      mimeType: json['mimeType'] as String? ?? 'audio/mp4',
+      byteSize: (json['byteSize'] as num? ?? 0).toInt(),
+      startedAt: (json['startedAt'] as String?) == null
+          ? null
+          : DateTime.parse(json['startedAt'] as String),
+      endedAt: (json['endedAt'] as String?) == null
+          ? null
+          : DateTime.parse(json['endedAt'] as String),
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      fileUrl: json['fileUrl'] as String? ?? '',
+    );
+  }
+}
+
 class SubmitResponse {
   const SubmitResponse({
     required this.id,
