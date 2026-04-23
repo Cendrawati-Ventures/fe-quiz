@@ -11,6 +11,7 @@ import '../../../app/theme/spacing.dart';
 import '../../../core/network/api_error.dart';
 import '../../../shared/components/app_card.dart';
 import '../model/exam_models.dart';
+import '../service/classroom_service.dart';
 import '../state/exam_state.dart';
 import 'widgets/admin_layout.dart';
 
@@ -26,7 +27,7 @@ class _AdminResultMonitoringScreenState
     extends ConsumerState<AdminResultMonitoringScreen> {
   String? _deletingResultId;
   String? _selectedClassName;
-  String? _selectedExamId;
+  String? _selectedExamTitle;
 
   Future<void> _openAudioChunks(ResultResponse result) async {
     if (!mounted) {
@@ -109,7 +110,7 @@ class _AdminResultMonitoringScreenState
 
   List<ResultResponse> _applyFilters(List<ResultResponse> results) {
     final classFilter = _selectedClassName?.trim();
-    final examFilter = _selectedExamId?.trim();
+    final examFilter = _selectedExamTitle?.trim();
 
     return results.where((item) {
       if (classFilter != null && classFilter.isNotEmpty) {
@@ -120,8 +121,8 @@ class _AdminResultMonitoringScreenState
       }
 
       if (examFilter != null && examFilter.isNotEmpty) {
-        final examId = item.examId?.trim() ?? "";
-        if (examId != examFilter) {
+        final examTitle = item.examTitle?.trim() ?? "";
+        if (examTitle != examFilter) {
           return false;
         }
       }
@@ -130,35 +131,44 @@ class _AdminResultMonitoringScreenState
     }).toList();
   }
 
-  List<String> _extractClassOptions(List<ResultResponse> results) {
-    final values = results
-        .map((item) => item.className?.trim() ?? "")
-        .where((item) => item.isNotEmpty)
-        .toSet()
-        .toList();
+  List<String> _extractClassOptions({
+    required List<ResultResponse> results,
+    required List<String> knownClassNames,
+  }) {
+    final values = <String>{
+      ...knownClassNames.where((item) => item.trim().isNotEmpty),
+      ...results
+          .map((item) => item.className?.trim() ?? "")
+          .where((item) => item.isNotEmpty),
+    }.toList();
     values.sort(
         (left, right) => left.toLowerCase().compareTo(right.toLowerCase()));
     return values;
   }
 
-  List<_ExamFilterOption> _extractExamOptions(List<ResultResponse> results) {
-    final optionsById = <String, _ExamFilterOption>{};
-    for (final item in results) {
-      final examId = item.examId?.trim();
-      if (examId == null || examId.isEmpty) {
+  List<_ExamFilterOption> _extractExamOptions({
+    required List<ResultResponse> results,
+    required List<String> knownExamTitles,
+  }) {
+    final optionsByTitle = <String, _ExamFilterOption>{};
+
+    for (final title in knownExamTitles) {
+      final normalized = title.trim();
+      if (normalized.isEmpty) {
         continue;
       }
-
-      final examTitle = item.examTitle?.trim();
-      optionsById[examId] = _ExamFilterOption(
-        examId: examId,
-        examTitle: (examTitle != null && examTitle.isNotEmpty)
-            ? examTitle
-            : "Ujian tanpa judul",
-      );
+      optionsByTitle[normalized] = _ExamFilterOption(examTitle: normalized);
     }
 
-    final values = optionsById.values.toList()
+    for (final item in results) {
+      final examTitle = item.examTitle?.trim();
+      if (examTitle == null || examTitle.isEmpty) {
+        continue;
+      }
+      optionsByTitle[examTitle] = _ExamFilterOption(examTitle: examTitle);
+    }
+
+    final values = optionsByTitle.values.toList()
       ..sort(
         (left, right) => left.examTitle.toLowerCase().compareTo(
               right.examTitle.toLowerCase(),
@@ -170,25 +180,26 @@ class _AdminResultMonitoringScreenState
   Widget _buildFilterCard({
     required List<ResultResponse> allResults,
     required List<ResultResponse> filteredResults,
+    required List<String> classOptions,
+    required List<_ExamFilterOption> examOptions,
   }) {
-    final classOptions = _extractClassOptions(allResults);
-    final examOptions = _extractExamOptions(allResults);
-    final examOptionIds = examOptions.map((item) => item.examId).toSet();
+    final examOptionTitles = examOptions.map((item) => item.examTitle).toSet();
 
     final selectedClassName =
         classOptions.contains(_selectedClassName) ? _selectedClassName : null;
-    final selectedExamId =
-        examOptionIds.contains(_selectedExamId) ? _selectedExamId : null;
+    final selectedExamTitle = examOptionTitles.contains(_selectedExamTitle)
+        ? _selectedExamTitle
+        : null;
 
     if (_selectedClassName != selectedClassName ||
-        _selectedExamId != selectedExamId) {
+        _selectedExamTitle != selectedExamTitle) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
           return;
         }
         setState(() {
           _selectedClassName = selectedClassName;
-          _selectedExamId = selectedExamId;
+          _selectedExamTitle = selectedExamTitle;
         });
       });
     }
@@ -226,7 +237,7 @@ class _AdminResultMonitoringScreenState
             width: 280,
             child: _buildFilterDropdown(
               label: "Filter Ujian",
-              value: selectedExamId,
+              value: selectedExamTitle,
               items: <DropdownMenuItem<String?>>[
                 const DropdownMenuItem<String?>(
                   value: null,
@@ -234,23 +245,24 @@ class _AdminResultMonitoringScreenState
                 ),
                 ...examOptions.map(
                   (exam) => DropdownMenuItem<String?>(
-                    value: exam.examId,
+                    value: exam.examTitle,
                     child: Text(exam.examTitle),
                   ),
                 ),
               ],
-              onChanged: (value) => setState(() => _selectedExamId = value),
+              onChanged: (value) => setState(() => _selectedExamTitle = value),
             ),
           ),
           OutlinedButton.icon(
-            onPressed: (_selectedClassName == null && _selectedExamId == null)
-                ? null
-                : () {
-                    setState(() {
-                      _selectedClassName = null;
-                      _selectedExamId = null;
-                    });
-                  },
+            onPressed:
+                (_selectedClassName == null && _selectedExamTitle == null)
+                    ? null
+                    : () {
+                        setState(() {
+                          _selectedClassName = null;
+                          _selectedExamTitle = null;
+                        });
+                      },
             icon: const Icon(Icons.clear_rounded),
             label: const Text("Reset Filter"),
           ),
@@ -281,6 +293,20 @@ class _AdminResultMonitoringScreenState
   @override
   Widget build(BuildContext context) {
     final resultsAsync = ref.watch(adminResultsProvider);
+    final knownClassNames = ref.watch(classListProvider).maybeWhen(
+          data: (classes) => classes
+              .map((item) => item.name.trim())
+              .where((item) => item.isNotEmpty)
+              .toList(),
+          orElse: () => const <String>[],
+        );
+    final knownExamTitles = ref.watch(examListProvider).maybeWhen(
+          data: (exams) => exams
+              .map((item) => item.title.trim())
+              .where((item) => item.isNotEmpty)
+              .toList(),
+          orElse: () => const <String>[],
+        );
     return AdminLayout(
       title: 'Pantau Hasil Ujian',
       subtitle: 'Pantau nilai dan tingkat risiko peserta ujian.',
@@ -298,6 +324,14 @@ class _AdminResultMonitoringScreenState
             );
           }
 
+          final classOptions = _extractClassOptions(
+            results: results,
+            knownClassNames: knownClassNames,
+          );
+          final examOptions = _extractExamOptions(
+            results: results,
+            knownExamTitles: knownExamTitles,
+          );
           final filteredResults = _applyFilters(results);
 
           return ListView(
@@ -305,6 +339,8 @@ class _AdminResultMonitoringScreenState
               _buildFilterCard(
                 allResults: results,
                 filteredResults: filteredResults,
+                classOptions: classOptions,
+                examOptions: examOptions,
               ),
               const SizedBox(height: AppSpacing.sm),
               if (filteredResults.isEmpty)
@@ -381,11 +417,9 @@ class _AdminResultMonitoringScreenState
 
 class _ExamFilterOption {
   const _ExamFilterOption({
-    required this.examId,
     required this.examTitle,
   });
 
-  final String examId;
   final String examTitle;
 }
 
