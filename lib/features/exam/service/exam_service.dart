@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
+import 'package:path/path.dart' as path_util;
 
 import '../../../core/network/api_error.dart';
 import '../model/exam_models.dart';
@@ -457,6 +460,77 @@ class ExamService {
     }
   }
 
+  Future<void> uploadProctoringAudioChunk({
+    required String attemptId,
+    required int chunkIndex,
+    required DateTime startedAt,
+    required DateTime endedAt,
+    required String filePath,
+    required String mimeType,
+  }) async {
+    final fileName = path_util.basename(filePath);
+    final payload = FormData.fromMap(<String, dynamic>{
+      'attemptId': attemptId,
+      'chunkIndex': chunkIndex,
+      'startedAt': startedAt.toUtc().toIso8601String(),
+      'endedAt': endedAt.toUtc().toIso8601String(),
+      'mimeType': mimeType,
+      'audio': await MultipartFile.fromFile(
+        filePath,
+        filename: fileName,
+      ),
+    });
+
+    try {
+      await _dio.post<dynamic>(
+        '/proctoring/audio-chunks',
+        data: payload,
+        options: _proctoringOptions(),
+      );
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<List<AttemptAudioChunk>> getAdminAttemptAudioChunks(
+    String attemptId,
+  ) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/proctoring/attempts/$attemptId/audio-chunks',
+        options: _readOptions(),
+      );
+      final data = response.data;
+      if (data is List<dynamic>) {
+        return data
+            .whereType<Map<String, dynamic>>()
+            .map(AttemptAudioChunk.fromJson)
+            .toList();
+      }
+      throw ApiError(message: 'Daftar rekaman belum bisa dimuat.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<Uint8List> downloadAdminAudioChunkFile(String chunkId) async {
+    try {
+      final response = await _dio.get<List<int>>(
+        '/proctoring/audio-chunks/$chunkId/file',
+        options: _readOptions().copyWith(
+          responseType: ResponseType.bytes,
+        ),
+      );
+      final bytes = response.data;
+      if (bytes == null || bytes.isEmpty) {
+        throw ApiError(message: 'File rekaman kosong.');
+      }
+      return Uint8List.fromList(bytes);
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
   Future<SubmitResponse> submitExam(String attemptId) async {
     try {
       final response = await _dio.post<dynamic>(
@@ -506,6 +580,17 @@ class ExamService {
             .toList();
       }
       throw ApiError(message: 'Data hasil belum bisa dimuat.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<void> deleteAdminResult(String resultId) async {
+    try {
+      await _dio.delete<dynamic>(
+        '/results/$resultId',
+        options: _writeOptions(),
+      );
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }

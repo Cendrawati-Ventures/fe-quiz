@@ -35,6 +35,12 @@ String? authRedirect(Ref ref, GoRouterState state) {
   }
 
   if (authState.status == AuthStatus.authenticated && authState.isSiswa) {
+    if (!sessionState.hasActiveAttempt &&
+        sessionState.submitState == SubmitState.success &&
+        isExamSessionRoute) {
+      return '/result';
+    }
+
     if (sessionState.hasActiveAttempt && !isExamSessionRoute) {
       return '/exam/session';
     }

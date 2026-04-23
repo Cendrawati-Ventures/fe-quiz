@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/spacing.dart';
 import '../state/auth_provider.dart';
-
-enum _LandingRole { siswa, admin }
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -16,10 +15,12 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  static const String _schoolLogoAssetPath =
+      'assets/images/school-logo-placeholder.svg';
+
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  _LandingRole _selectedRole = _LandingRole.siswa;
   bool _obscurePassword = true;
 
   @override
@@ -50,12 +51,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(authState.errorMessage!)));
     }
-  }
-
-  String get _usernameHint {
-    return _selectedRole == _LandingRole.siswa
-        ? 'Masukkan username atau NIS'
-        : 'Masukkan username admin';
   }
 
   @override
@@ -238,10 +233,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           width: 4,
                         ),
                       ),
-                      child: const Icon(
-                        Icons.school_rounded,
-                        size: 56,
-                        color: Color(0xFF218D4D),
+                      child: ClipOval(
+                        child: SvgPicture.asset(
+                          _schoolLogoAssetPath,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                   ),
@@ -453,10 +449,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               color: const Color(0xFFF6F6F2),
               border: Border.all(color: const Color(0xFF19A453), width: 3),
             ),
-            child: const Icon(
-              Icons.school_rounded,
-              size: 28,
-              color: Color(0xFF218D4D),
+            child: ClipOval(
+              child: SvgPicture.asset(
+                _schoolLogoAssetPath,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -553,43 +550,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Pilih peran, lalu masuk ke sistem ujian.',
+              'Masukkan username dan kata sandi. '
+              'Sistem akan masuk sesuai role akun.',
               style: textTheme.bodyLarge?.copyWith(
                 color: const Color(0xFF7B6848),
               ),
             ),
             SizedBox(height: mobileFirst ? AppSpacing.md : AppSpacing.lg),
-            DropdownButtonFormField<_LandingRole>(
-              initialValue: _selectedRole,
-              decoration: const InputDecoration(labelText: 'Masuk sebagai'),
-              items: const <DropdownMenuItem<_LandingRole>>[
-                DropdownMenuItem(
-                  value: _LandingRole.siswa,
-                  child: Text('Siswa'),
-                ),
-                DropdownMenuItem(
-                  value: _LandingRole.admin,
-                  child: Text('Admin'),
-                ),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() {
-                  _selectedRole = value;
-                });
-              },
-            ),
-            const SizedBox(height: AppSpacing.md),
             TextFormField(
               controller: _usernameController,
               decoration: InputDecoration(
-                labelText: 'Username / NIS',
-                hintText: _usernameHint,
+                labelText: 'Username',
+                hintText: 'Masukkan username akun',
               ),
               textInputAction: TextInputAction.next,
               validator: (value) {
-                if (value == null || value.trim().isEmpty) {
+                final trimmed = value?.trim() ?? '';
+                if (trimmed.isEmpty) {
                   return 'Username wajib diisi';
+                }
+                if (trimmed.length < 3) {
+                  return 'Username minimal 3 karakter';
                 }
                 return null;
               },
@@ -622,6 +603,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Kata sandi wajib diisi';
+                }
+                if (value.length < 6) {
+                  return 'Kata sandi minimal 6 karakter';
                 }
                 return null;
               },

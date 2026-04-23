@@ -21,6 +21,10 @@ dependencies:
   file_picker: 10.3.3
   logger: 2.7.0
   noise_meter: 5.1.0
+  audioplayers: 6.1.0
+  record: 6.2.0
+  path_provider: 2.1.5
+  flutter_svg: 2.2.0
 
 dev_dependencies:
   flutter_test:
@@ -28,6 +32,18 @@ dev_dependencies:
   flutter_lints: 5.0.0
   build_runner: 2.13.1
   riverpod_generator: 4.0.0+1
+  flutter_launcher_icons: 0.14.4
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/audio/default-music.wav
+    - assets/images/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "logo.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "logo.png"

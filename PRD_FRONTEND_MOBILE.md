@@ -1427,3 +1427,48 @@ Urutan prioritas implementasi:
 2. OpenAPI backend (`/docs.json`).
 3. `PRD_BACKEND.md` (rule bisnis/arsitektur).
 4. PRD frontend ini (detail UI/state sebagai turunan backend).
+
+## 43. Addendum Scope Implementasi (Tambahan yang Kini Resmi)
+
+Section ini menetapkan fitur tambahan yang sudah ada di implementasi sebagai bagian resmi scope frontend.
+
+### 43.1 Admin Operations Expansion (Mobile Admin)
+Selain modul admin inti (`dashboard`, `subject`, `question`, `result`), frontend resmi mencakup:
+- `Class Management` (`/admin/classes`)
+- `Class Student Assignment` (`/admin/classes/:id/students`)
+- `Class Subject Assignment` (`/admin/classes/:id/subjects`)
+- `Student Account Management` (`/admin/students`)
+
+Semua flow di atas dianggap bagian dari produk utama, bukan fitur eksperimen.
+
+### 43.2 Student Identity Gate Sebelum Start Exam
+Sebelum siswa dapat memulai ujian:
+- `fullName` dan `rollNumber` wajib diisi.
+- siswa harus sudah memiliki assignment kelas (`classId` / `className`) dari admin.
+
+Jika syarat belum terpenuhi, frontend wajib menahan aksi start dan menampilkan pesan aksi yang jelas.
+
+### 43.3 Routing Extension Policy
+Rute tambahan berikut menjadi bagian kontrak navigasi resmi:
+- `/admin/classes`
+- `/admin/classes/:id/students`
+- `/admin/classes/:id/subjects`
+- `/admin/students`
+- `/exam/:examId/start` (entry detail opsional)
+
+Catatan:
+- Entry utama siswa tetap dari `/exam` (subject-first start).
+- `/exam/:examId/start` boleh dipakai untuk entry terarah (deep link/internal action) selama guard auth+role tetap berlaku.
+
+### 43.4 Kontrak Endpoint Tambahan untuk Frontend
+Frontend resmi menggunakan endpoint tambahan backend berikut:
+- `GET/POST/PUT/DELETE /classes*` (admin only)
+- `GET/POST/DELETE /students*` (admin only)
+- `GET/PUT /users/me` (profile fetch/update)
+
+Untuk kompatibilitas server saat ini:
+- canonical: `/subjects`, `/questions/*`
+- alias yang didukung: `/api/subjects`, `/api/questions/*`
+
+### 43.5 Status Scope
+Semua item di Section 43 bukan lagi "kelebihan", tetapi scope resmi PRD frontend.

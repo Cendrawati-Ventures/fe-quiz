@@ -7,10 +7,15 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import '../auth/auth_event_bus.dart';
 import '../storage/secure_storage.dart';
 
-final apiClientProvider = Provider<Dio>((ref) {
+final apiClientControllerProvider = Provider<ApiClient>((ref) {
   final secureStorage = ref.watch(secureStorageProvider);
   final authEventBus = ref.watch(authEventBusProvider);
-  return ApiClient(secureStorage, authEventBus: authEventBus).dio;
+  return ApiClient(secureStorage, authEventBus: authEventBus);
+});
+
+final apiClientProvider = Provider<Dio>((ref) {
+  final apiClient = ref.watch(apiClientControllerProvider);
+  return apiClient.dio;
 });
 
 class ApiClient {
@@ -37,8 +42,21 @@ class ApiClient {
   final AuthEventBus? _authEventBus;
   final Logger _logger;
   bool _isHandlingUnauthorized = false;
+  String? _cachedToken;
 
   Dio get dio => _dio;
+
+  void setAuthToken(String? token) {
+    final normalized = token?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      _cachedToken = null;
+      _dio.options.headers.remove('Authorization');
+      return;
+    }
+
+    _cachedToken = normalized;
+    _dio.options.headers['Authorization'] = 'Bearer $normalized';
+  }
 
   static BaseOptions _buildBaseOptions() {
     return BaseOptions(
@@ -69,7 +87,13 @@ class ApiClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           if (!_shouldSkipAuth(options)) {
-            final token = await _secureStorage.getToken();
+            var token = _cachedToken;
+            if (token == null || token.isEmpty) {
+              token = (await _secureStorage.getToken())?.trim();
+              if (token != null && token.isNotEmpty) {
+                _cachedToken = token;
+              }
+            }
             if (token != null && token.isNotEmpty) {
               options.headers['Authorization'] = 'Bearer $token';
             }
@@ -89,13 +113,17 @@ class ApiClient {
     if (kDebugMode) {
       _dio.interceptors.add(
         PrettyDioLogger(
-          requestHeader: true,
+          requestHeader: false,
           requestBody: true,
           responseHeader: false,
           responseBody: true,
           error: true,
           compact: true,
           maxWidth: 120,
+          filter: (options, _) {
+            final path = _normalizePath(options.path);
+            return path != '/auth/login';
+          },
         ),
       );
     }
@@ -144,6 +172,7 @@ class ApiClient {
     _isHandlingUnauthorized = true;
     try {
       await _secureStorage.clearAuthSession();
+      setAuthToken(null);
       _authEventBus?.emitUnauthorized();
     } finally {
       _isHandlingUnauthorized = false;
@@ -151,10 +180,14 @@ class ApiClient {
   }
 
   void _logError(DioException error) {
+    final statusCode = error.response?.statusCode;
+    final isClientError =
+        statusCode != null && statusCode >= 400 && statusCode < 500;
+
     _logger.e(
       'Permintaan API gagal: ${error.requestOptions.method} ${error.requestOptions.uri}',
-      error: error.error ?? error.message,
-      stackTrace: error.stackTrace,
+      error: isClientError ? error.message : (error.error ?? error.message),
+      stackTrace: isClientError ? null : error.stackTrace,
     );
   }
 

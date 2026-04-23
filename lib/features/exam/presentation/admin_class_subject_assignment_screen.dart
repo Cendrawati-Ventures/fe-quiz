@@ -102,11 +102,12 @@ class _AdminClassSubjectAssignmentScreenState
   }
 
   Future<void> _saveAssignments() async {
-    final detail =
-        await ref.read(adminClassActionProvider.notifier).saveSubjectAssignments(
-              classId: widget.classId,
-              subjectIds: _selectedSubjectIds.toList(),
-            );
+    final detail = await ref
+        .read(adminClassActionProvider.notifier)
+        .saveSubjectAssignments(
+          classId: widget.classId,
+          subjectIds: _selectedSubjectIds.toList(),
+        );
 
     if (!mounted) {
       return;
@@ -130,6 +131,9 @@ class _AdminClassSubjectAssignmentScreenState
     final detailAsync = ref.watch(classDetailProvider(widget.classId));
     final subjectsAsync = ref.watch(subjectListProvider);
     final actionState = ref.watch(adminClassActionProvider);
+    final topSectionMaxHeight = (MediaQuery.sizeOf(context).height * 0.32)
+        .clamp(120.0, 260.0)
+        .toDouble();
 
     return AdminLayout(
       title: 'Atur Ujian Kelas',
@@ -153,88 +157,96 @@ class _AdminClassSubjectAssignmentScreenState
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  AppCard(
-                    title: 'Kelas: ${detail.name}',
-                    subtitle:
-                        '${_selectedSubjectIds.length} ujian dipilih dari ${subjects.length} total ujian.',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        TextField(
-                          controller: _searchController,
-                          decoration: const InputDecoration(
-                            labelText: 'Cari ujian',
-                            hintText: 'Cari berdasarkan nama atau deskripsi',
-                            prefixIcon: Icon(Icons.search_rounded),
-                          ),
-                          onChanged: (value) {
-                            setState(() {
-                              _query = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Wrap(
-                          spacing: AppSpacing.xs,
-                          runSpacing: AppSpacing.xs,
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: topSectionMaxHeight),
+                    child: SingleChildScrollView(
+                      primary: false,
+                      child: AppCard(
+                        title: 'Kelas: ${detail.name}',
+                        subtitle:
+                            '${_selectedSubjectIds.length} ujian dipilih dari ${subjects.length} total ujian.',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
-                            ChoiceChip(
-                              label: const Text('Semua'),
-                              selected: _filter == _SubjectFilter.all,
-                              onSelected: (_) {
+                            TextField(
+                              controller: _searchController,
+                              decoration: const InputDecoration(
+                                labelText: 'Cari ujian',
+                                hintText:
+                                    'Cari berdasarkan nama atau deskripsi',
+                                prefixIcon: Icon(Icons.search_rounded),
+                              ),
+                              onChanged: (value) {
                                 setState(() {
-                                  _filter = _SubjectFilter.all;
+                                  _query = value;
                                 });
                               },
                             ),
-                            ChoiceChip(
-                              label: const Text('Terpilih'),
-                              selected: _filter == _SubjectFilter.selected,
-                              onSelected: (_) {
-                                setState(() {
-                                  _filter = _SubjectFilter.selected;
-                                });
-                              },
+                            const SizedBox(height: AppSpacing.sm),
+                            Wrap(
+                              spacing: AppSpacing.xs,
+                              runSpacing: AppSpacing.xs,
+                              children: <Widget>[
+                                ChoiceChip(
+                                  label: const Text('Semua'),
+                                  selected: _filter == _SubjectFilter.all,
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _filter = _SubjectFilter.all;
+                                    });
+                                  },
+                                ),
+                                ChoiceChip(
+                                  label: const Text('Terpilih'),
+                                  selected: _filter == _SubjectFilter.selected,
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _filter = _SubjectFilter.selected;
+                                    });
+                                  },
+                                ),
+                                ChoiceChip(
+                                  label: const Text('Belum Dipilih'),
+                                  selected:
+                                      _filter == _SubjectFilter.unselected,
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _filter = _SubjectFilter.unselected;
+                                    });
+                                  },
+                                ),
+                              ],
                             ),
-                            ChoiceChip(
-                              label: const Text('Belum Dipilih'),
-                              selected: _filter == _SubjectFilter.unselected,
-                              onSelected: (_) {
-                                setState(() {
-                                  _filter = _SubjectFilter.unselected;
-                                });
-                              },
+                            const SizedBox(height: AppSpacing.sm),
+                            Wrap(
+                              spacing: AppSpacing.sm,
+                              runSpacing: AppSpacing.sm,
+                              children: <Widget>[
+                                SizedBox(
+                                  width: 210,
+                                  child: AppButton(
+                                    label: 'Pilih Semua Hasil',
+                                    variant: AppButtonVariant.secondary,
+                                    onPressed: filteredSubjects.isEmpty
+                                        ? null
+                                        : () => _selectAll(filteredSubjects),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: 210,
+                                  child: AppButton(
+                                    label: 'Kosongkan Hasil',
+                                    variant: AppButtonVariant.ghost,
+                                    onPressed: filteredSubjects.isEmpty
+                                        ? null
+                                        : () => _clearAll(filteredSubjects),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Wrap(
-                          spacing: AppSpacing.sm,
-                          runSpacing: AppSpacing.sm,
-                          children: <Widget>[
-                            SizedBox(
-                              width: 210,
-                              child: AppButton(
-                                label: 'Pilih Semua Hasil',
-                                variant: AppButtonVariant.secondary,
-                                onPressed: filteredSubjects.isEmpty
-                                    ? null
-                                    : () => _selectAll(filteredSubjects),
-                              ),
-                            ),
-                            SizedBox(
-                              width: 210,
-                              child: AppButton(
-                                label: 'Kosongkan Hasil',
-                                variant: AppButtonVariant.ghost,
-                                onPressed: filteredSubjects.isEmpty
-                                    ? null
-                                    : () => _clearAll(filteredSubjects),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -272,8 +284,8 @@ class _AdminClassSubjectAssignmentScreenState
                                     itemCount: filteredSubjects.length,
                                     itemBuilder: (context, index) {
                                       final subject = filteredSubjects[index];
-                                      final selected =
-                                          _selectedSubjectIds.contains(subject.id);
+                                      final selected = _selectedSubjectIds
+                                          .contains(subject.id);
 
                                       return CheckboxListTile(
                                         dense: true,

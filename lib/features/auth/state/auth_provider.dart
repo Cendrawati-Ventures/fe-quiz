@@ -61,12 +61,14 @@ final authProvider = NotifierProvider<AuthNotifier, AuthState>(
 class AuthNotifier extends Notifier<AuthState> {
   late final AuthService _service;
   late final AppSecureStorage _secureStorage;
+  late final ApiClient _apiClient;
   StreamSubscription<AuthEvent>? _authEventSubscription;
 
   @override
   AuthState build() {
     _service = ref.read(authServiceProvider);
     _secureStorage = ref.read(secureStorageProvider);
+    _apiClient = ref.read(apiClientControllerProvider);
     final eventBus = ref.read(authEventBusProvider);
 
     _authEventSubscription?.cancel();
@@ -74,6 +76,7 @@ class AuthNotifier extends Notifier<AuthState> {
       if (event != AuthEvent.unauthorized) {
         return;
       }
+      _apiClient.setAuthToken(null);
       ref.invalidate(examListProvider);
       ref.invalidate(subjectListProvider);
       ref.invalidate(myResultsProvider);
@@ -98,6 +101,7 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> _restoreSession() async {
     final token = await _secureStorage.getToken();
     if (token != null && token.isNotEmpty) {
+      _apiClient.setAuthToken(token);
       final cachedUser = await _secureStorage.getUser();
       if (cachedUser != null) {
         state = AuthState(
@@ -117,9 +121,11 @@ class AuthNotifier extends Notifier<AuthState> {
         return;
       } on ApiError {
         await _secureStorage.clearAuthSession();
+        _apiClient.setAuthToken(null);
       }
     }
 
+    _apiClient.setAuthToken(null);
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
@@ -143,6 +149,7 @@ class AuthNotifier extends Notifier<AuthState> {
       final session = await _service.login(
         LoginRequest(username: username, password: password),
       );
+      _apiClient.setAuthToken(session.token);
       await _secureStorage.saveToken(session.token);
       await _secureStorage.saveUser(session.user);
       await ref.read(examSessionProvider.notifier).clearSession();
@@ -253,6 +260,7 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
+    _apiClient.setAuthToken(null);
     await _secureStorage.clearAuthSession();
     await ref.read(examSessionProvider.notifier).clearSession();
     ref.invalidate(examListProvider);
