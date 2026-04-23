@@ -683,6 +683,10 @@ class SubmitResponse {
     return ResultResponse(
       id: id,
       attemptId: attemptId,
+      examId: null,
+      subjectId: null,
+      classId: null,
+      className: null,
       score: score,
       correct: correct,
       wrong: wrong,
@@ -700,6 +704,10 @@ class ResultResponse {
   const ResultResponse({
     required this.id,
     required this.attemptId,
+    required this.examId,
+    required this.subjectId,
+    required this.classId,
+    required this.className,
     required this.score,
     required this.correct,
     required this.wrong,
@@ -713,6 +721,10 @@ class ResultResponse {
 
   final String id;
   final String attemptId;
+  final String? examId;
+  final String? subjectId;
+  final String? classId;
+  final String? className;
   final num score;
   final int correct;
   final int wrong;
@@ -727,6 +739,10 @@ class ResultResponse {
     return ResultResponse(
       id: json['id'] as String,
       attemptId: json['attemptId'] as String,
+      examId: json['examId'] as String?,
+      subjectId: json['subjectId'] as String?,
+      classId: json['classId'] as String?,
+      className: json['className'] as String?,
       score: json['score'] as num? ?? 0,
       correct: json['correct'] as int? ?? 0,
       wrong: json['wrong'] as int? ?? 0,
@@ -743,6 +759,10 @@ class ResultResponse {
     return <String, dynamic>{
       'id': id,
       'attemptId': attemptId,
+      'examId': examId,
+      'subjectId': subjectId,
+      'classId': classId,
+      'className': className,
       'score': score,
       'correct': correct,
       'wrong': wrong,
@@ -764,6 +784,36 @@ class AttemptAnswer {
 
   final String questionId;
   final Object? answer;
+}
+
+class AdminAttemptAnswer {
+  const AdminAttemptAnswer({
+    required this.questionId,
+    required this.answer,
+    required this.isCorrect,
+    required this.question,
+  });
+
+  final String questionId;
+  final Object? answer;
+  final bool? isCorrect;
+  final AdminQuestion? question;
+
+  factory AdminAttemptAnswer.fromJson(Map<String, dynamic> json) {
+    final rawQuestion = json['question'];
+    final parsedQuestion = rawQuestion is Map<String, dynamic>
+        ? AdminQuestion.fromJson(rawQuestion)
+        : null;
+    final questionId = (json['questionId'] as String?)?.trim();
+    return AdminAttemptAnswer(
+      questionId: (questionId != null && questionId.isNotEmpty)
+          ? questionId
+          : (parsedQuestion?.id ?? ''),
+      answer: json['answer'],
+      isCorrect: json['isCorrect'] as bool?,
+      question: parsedQuestion,
+    );
+  }
 }
 
 class AttemptDetail {
