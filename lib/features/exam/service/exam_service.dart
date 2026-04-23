@@ -567,9 +567,25 @@ class ExamService {
   }
 
   Future<List<ResultResponse>> getAdminResults() async {
+    return getAdminResultsWithFilter();
+  }
+
+  Future<List<ResultResponse>> getAdminResultsWithFilter({
+    String? classId,
+    String? examId,
+  }) async {
+    final queryParameters = <String, dynamic>{};
+    if (classId != null && classId.trim().isNotEmpty) {
+      queryParameters['classId'] = classId.trim();
+    }
+    if (examId != null && examId.trim().isNotEmpty) {
+      queryParameters['examId'] = examId.trim();
+    }
+
     try {
       final response = await _dio.get<dynamic>(
         '/results/admin',
+        queryParameters: queryParameters.isEmpty ? null : queryParameters,
         options: _readOptions(),
       );
       final data = response.data;
@@ -580,6 +596,33 @@ class ExamService {
             .toList();
       }
       throw ApiError(message: 'Data hasil belum bisa dimuat.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<List<AdminAttemptAnswer>> getAdminAttemptAnswers(
+      String attemptId) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/attempts/$attemptId',
+        options: _readOptions(),
+      );
+      final data = response.data;
+      if (data is! Map<String, dynamic>) {
+        throw ApiError(message: 'Detail attempt tidak valid.');
+      }
+
+      final rawAnswers = data['answers'];
+      if (rawAnswers is! List<dynamic>) {
+        return const <AdminAttemptAnswer>[];
+      }
+
+      return rawAnswers
+          .whereType<Map<String, dynamic>>()
+          .map(AdminAttemptAnswer.fromJson)
+          .where((answer) => answer.questionId.trim().isNotEmpty)
+          .toList();
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }

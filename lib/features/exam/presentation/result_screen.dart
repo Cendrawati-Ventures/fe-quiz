@@ -538,6 +538,10 @@ _LatestResultView? _resolveLatestResult({
         merged = ResultResponse(
           id: sessionLatest.id,
           attemptId: sessionLatest.attemptId,
+          examId: sessionLatest.examId ?? item.examId,
+          subjectId: sessionLatest.subjectId ?? item.subjectId,
+          classId: sessionLatest.classId ?? item.classId,
+          className: sessionLatest.className ?? item.className,
           score: sessionLatest.score,
           correct: sessionLatest.correct,
           wrong: sessionLatest.wrong,
