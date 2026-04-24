@@ -32,7 +32,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   static const String _backgroundMusicAsset = 'audio/default-music.wav';
   static const double _backgroundMusicVolume = 0.28;
   static const Duration _audioChunkDuration = Duration(seconds: 30);
-  static const String _audioChunkMimeType = 'audio/wav';
+  static const String _audioChunkMimeType = 'audio/mp4';
+  static const String _audioChunkFileExtension = 'm4a';
 
   bool _isSubmitFailureDialogVisible = false;
   BuildContext? _submitFailureDialogContext;
@@ -530,12 +531,13 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
       final tempDir = await getTemporaryDirectory();
       final filePath =
-          '${tempDir.path}${Platform.pathSeparator}attempt_${attemptId}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+          '${tempDir.path}${Platform.pathSeparator}attempt_${attemptId}_${DateTime.now().millisecondsSinceEpoch}.$_audioChunkFileExtension';
 
       await recorder.start(
         const RecordConfig(
-          encoder: AudioEncoder.wav,
-          sampleRate: 16000,
+          encoder: AudioEncoder.aacLc,
+          bitRate: 64000,
+          sampleRate: 44100,
           numChannels: 1,
         ),
         path: filePath,

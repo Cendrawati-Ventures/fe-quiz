@@ -316,6 +316,9 @@ class _LatestResultCard extends StatelessWidget {
         : '-';
     final totalQuestion = latest.result.correct + latest.result.wrong;
     final allowReview = latest.subject?.allowReview ?? false;
+    final proctoringSummaryText = _proctoringSummaryText(
+      latest.result.proctoringReport,
+    );
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -404,6 +407,18 @@ class _LatestResultCard extends StatelessWidget {
                   color: const Color(0xFF6C624F),
                 ),
           ),
+          const SizedBox(height: AppSpacing.sm),
+          _buildProctoringInfo(
+            context,
+            report: latest.result.proctoringReport,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            proctoringSummaryText,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF6C624F),
+                ),
+          ),
           const SizedBox(height: AppSpacing.md),
           Wrap(
             spacing: AppSpacing.sm,
@@ -472,6 +487,56 @@ class _LatestResultCard extends StatelessWidget {
     );
   }
 
+  Widget _buildProctoringInfo(
+    BuildContext context, {
+    required ProctoringReport? report,
+  }) {
+    final notes = _buildProctoringNotes(report);
+    final hasNotes = notes.isNotEmpty;
+    final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: const Color(0xFF3F341F),
+          fontWeight: FontWeight.w700,
+        );
+    final bodyStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: const Color(0xFF6C624F),
+          height: 1.45,
+        );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: const Color(0xFFF1EFE5),
+        border: Border.all(color: const Color(0xFFD8D3BE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text('Laporan Pengawasan (Informasi)', style: titleStyle),
+          const SizedBox(height: AppSpacing.xxs),
+          if (!hasNotes)
+            Text(
+              'Tidak ada kejadian mencurigakan yang tercatat pada sesi ini.',
+              style: bodyStyle,
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: notes
+                  .map(
+                    (note) => Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text('- $note', style: bodyStyle),
+                    ),
+                  )
+                  .toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showReviewInfo({
     required BuildContext context,
     required bool allowReview,
@@ -504,10 +569,11 @@ class _HistoryResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = result.correct + result.wrong;
+    final summary = _proctoringSummaryText(result.proctoringReport);
     return AppCard(
       title: result.examTitle ?? 'Hasil Ujian',
       subtitle:
-          '${result.subjectName ?? '-'}\nNilai: ${result.score} | Benar: ${result.correct} | Salah: ${result.wrong} | Total: $total',
+          '${result.subjectName ?? '-'}\nNilai: ${result.score} | Benar: ${result.correct} | Salah: ${result.wrong} | Total: $total\nPengawasan: $summary',
       status: 'Durasi: ${_formatDuration(result.duration)}',
     );
   }
@@ -551,6 +617,8 @@ _LatestResultView? _resolveLatestResult({
           examTitle: item.examTitle ?? sessionLatest.examTitle,
           subjectName: item.subjectName ?? sessionLatest.subjectName,
           username: item.username ?? sessionLatest.username,
+          proctoringReport:
+              item.proctoringReport ?? sessionLatest.proctoringReport,
         );
         break;
       }
@@ -575,6 +643,59 @@ _LatestResultView? _resolveLatestResult({
     subject: null,
     attempt: null,
   );
+}
+
+List<String> _buildProctoringNotes(ProctoringReport? report) {
+  if (report == null) {
+    return const <String>[];
+  }
+
+  final normalizedNotes = report.notes
+      .map((item) => item.trim())
+      .where((item) => item.isNotEmpty)
+      .toList();
+  if (normalizedNotes.isNotEmpty) {
+    return normalizedNotes;
+  }
+
+  final fallback = <String>[];
+  if (report.tabSwitchCount > 0) {
+    fallback.add(
+      'Perpindahan tab/jendela: ${report.tabSwitchCount} kali.',
+    );
+  }
+  if (report.appBackgroundCount > 0) {
+    fallback.add(
+      'Aplikasi keluar/latar belakang: ${report.appBackgroundCount} kali.',
+    );
+  }
+  if (report.idleCount > 0) {
+    final maxIdle = report.maxIdleSeconds;
+    fallback.add(
+      maxIdle == null
+          ? 'Tidak aktif: ${report.idleCount} kali.'
+          : 'Tidak aktif: ${report.idleCount} kali (maks $maxIdle detik).',
+    );
+  }
+  if (report.noiseCount > 0) {
+    final maxNoise = report.maxNoiseLevel;
+    fallback.add(
+      maxNoise == null
+          ? 'Kebisingan/indikasi percakapan: ${report.noiseCount} kali.'
+          : 'Kebisingan/indikasi percakapan: ${report.noiseCount} kali (maks $maxNoise/100).',
+    );
+  }
+
+  return fallback;
+}
+
+String _proctoringSummaryText(ProctoringReport? report) {
+  final notes = _buildProctoringNotes(report);
+  if (notes.isEmpty) {
+    return 'Tidak ada indikasi mencurigakan.';
+  }
+
+  return '${notes.length} indikator tercatat sebagai informasi.';
 }
 
 String _formatDuration(int seconds) {

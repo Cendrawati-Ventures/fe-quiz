@@ -717,6 +717,7 @@ class ResultResponse {
     required this.examTitle,
     required this.subjectName,
     required this.username,
+    this.proctoringReport,
   });
 
   final String id;
@@ -734,6 +735,7 @@ class ResultResponse {
   final String? examTitle;
   final String? subjectName;
   final String? username;
+  final ProctoringReport? proctoringReport;
 
   factory ResultResponse.fromJson(Map<String, dynamic> json) {
     return ResultResponse(
@@ -752,6 +754,12 @@ class ResultResponse {
       examTitle: json['examTitle'] as String?,
       subjectName: json['subjectName'] as String?,
       username: json['username'] as String?,
+      proctoringReport:
+          (json['proctoringReport'] as Map<String, dynamic>?) == null
+              ? null
+              : ProctoringReport.fromJson(
+                  json['proctoringReport'] as Map<String, dynamic>,
+                ),
     );
   }
 
@@ -772,6 +780,58 @@ class ResultResponse {
       'examTitle': examTitle,
       'subjectName': subjectName,
       'username': username,
+      'proctoringReport': proctoringReport?.toJson(),
+    };
+  }
+}
+
+class ProctoringReport {
+  const ProctoringReport({
+    required this.totalEvents,
+    required this.tabSwitchCount,
+    required this.appBackgroundCount,
+    required this.idleCount,
+    required this.noiseCount,
+    required this.maxIdleSeconds,
+    required this.maxNoiseLevel,
+    required this.notes,
+  });
+
+  final int totalEvents;
+  final int tabSwitchCount;
+  final int appBackgroundCount;
+  final int idleCount;
+  final int noiseCount;
+  final int? maxIdleSeconds;
+  final int? maxNoiseLevel;
+  final List<String> notes;
+
+  factory ProctoringReport.fromJson(Map<String, dynamic> json) {
+    return ProctoringReport(
+      totalEvents: (json['totalEvents'] as num? ?? 0).toInt(),
+      tabSwitchCount: (json['tabSwitchCount'] as num? ?? 0).toInt(),
+      appBackgroundCount: (json['appBackgroundCount'] as num? ?? 0).toInt(),
+      idleCount: (json['idleCount'] as num? ?? 0).toInt(),
+      noiseCount: (json['noiseCount'] as num? ?? 0).toInt(),
+      maxIdleSeconds: (json['maxIdleSeconds'] as num?)?.toInt(),
+      maxNoiseLevel: (json['maxNoiseLevel'] as num?)?.toInt(),
+      notes: (json['notes'] as List<dynamic>? ?? const <dynamic>[])
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'totalEvents': totalEvents,
+      'tabSwitchCount': tabSwitchCount,
+      'appBackgroundCount': appBackgroundCount,
+      'idleCount': idleCount,
+      'noiseCount': noiseCount,
+      'maxIdleSeconds': maxIdleSeconds,
+      'maxNoiseLevel': maxNoiseLevel,
+      'notes': notes,
     };
   }
 }

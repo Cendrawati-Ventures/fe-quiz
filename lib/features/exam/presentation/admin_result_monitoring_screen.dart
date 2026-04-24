@@ -290,6 +290,41 @@ class _AdminResultMonitoringScreenState
     );
   }
 
+  String _proctoringSummary(ResultResponse result) {
+    final report = result.proctoringReport;
+    if (report == null) {
+      return "Tidak ada indikasi mencurigakan.";
+    }
+
+    final notes = report.notes
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+    if (notes.isNotEmpty) {
+      return notes.join(" ");
+    }
+
+    final parts = <String>[];
+    if (report.tabSwitchCount > 0) {
+      parts.add("tab/jendela ${report.tabSwitchCount}x");
+    }
+    if (report.appBackgroundCount > 0) {
+      parts.add("keluar app ${report.appBackgroundCount}x");
+    }
+    if (report.idleCount > 0) {
+      parts.add("idle ${report.idleCount}x");
+    }
+    if (report.noiseCount > 0) {
+      parts.add("bising ${report.noiseCount}x");
+    }
+
+    if (parts.isEmpty) {
+      return "Tidak ada indikasi mencurigakan.";
+    }
+
+    return "Indikator terdeteksi: ${parts.join(", ")}.";
+  }
+
   @override
   Widget build(BuildContext context) {
     final resultsAsync = ref.watch(adminResultsProvider);
@@ -359,7 +394,7 @@ class _AdminResultMonitoringScreenState
                   child: AppCard(
                     title: result.examTitle ?? 'Ujian',
                     subtitle:
-                        'Peserta: ${result.username ?? '-'}\nKelas: $className\nNilai: ${result.score}\nRisiko: ${riskLevelLabel(result.riskLevel)}',
+                        'Peserta: ${result.username ?? '-'}\nKelas: $className\nNilai: ${result.score}\nRisiko: ${riskLevelLabel(result.riskLevel)}\nInfo Pengawasan: ${_proctoringSummary(result)}',
                     status: result.subjectName,
                     child: Wrap(
                       alignment: WrapAlignment.end,
@@ -589,12 +624,81 @@ class _AdminAnswerReviewDialogState
       return "-";
     }
 
-    final optionLabels = <String, String>{
-      for (final option in parseAdminChoiceOptions(question.options))
-        option.value: option.label,
-    };
+    if (question.type == QuestionType.group) {
+      return _formatRawValue(value);
+    }
 
-    if (question.type == QuestionType.single) {
+    final options = _parseChoiceOptions(question.options);
+    final optionLabels = _optionLabelByValue(options);
+    return _formatChoiceAnswerValue(
+      questionType: question.type,
+      value: value,
+      optionLabels: optionLabels,
+    );
+  }
+
+  String _formatOptionLabel(String value, Map<String, String> optionLabels) {
+    final normalizedValue = value.trim();
+    if (normalizedValue.isEmpty) {
+      return "-";
+    }
+
+    final label = _lookupOptionLabel(normalizedValue, optionLabels);
+    if (label == null || label.isEmpty) {
+      return normalizedValue;
+    }
+    return "$normalizedValue. $label";
+  }
+
+  List<AdminQuestionOption> _parseChoiceOptions(Object? rawOptions) {
+    final parsed = parseAdminChoiceOptions(rawOptions);
+    final uniqueValues = <String>{};
+    final result = <AdminQuestionOption>[];
+
+    for (final option in parsed) {
+      final value = option.value.trim();
+      if (value.isEmpty || uniqueValues.contains(value)) {
+        continue;
+      }
+      uniqueValues.add(value);
+      final label = option.label.trim();
+      result.add(
+        AdminQuestionOption(
+          value: value,
+          label: label.isEmpty ? value : label,
+        ),
+      );
+    }
+
+    return result;
+  }
+
+  Map<String, String> _optionLabelByValue(List<AdminQuestionOption> options) {
+    return <String, String>{
+      for (final option in options) option.value: option.label,
+    };
+  }
+
+  String _formatChoiceAnswerValue({
+    required QuestionType questionType,
+    required Object? value,
+    required Map<String, String> optionLabels,
+  }) {
+    if (_isEmptyAnswer(value)) {
+      return "-";
+    }
+
+    if (questionType == QuestionType.multi) {
+      final values = parseAnswerValueList(value);
+      if (values.isEmpty) {
+        return "-";
+      }
+      return values
+          .map((item) => _formatOptionLabel(item, optionLabels))
+          .join("\n");
+    }
+
+    if (questionType == QuestionType.single) {
       final raw = value?.toString().trim() ?? "";
       if (raw.isEmpty) {
         return "-";
@@ -602,25 +706,301 @@ class _AdminAnswerReviewDialogState
       return _formatOptionLabel(raw, optionLabels);
     }
 
-    if (question.type == QuestionType.multi) {
-      final values = parseAnswerValueList(value);
-      if (values.isEmpty) {
-        return "-";
-      }
-      return values
-          .map((item) => _formatOptionLabel(item, optionLabels))
-          .join(", ");
-    }
-
     return _formatRawValue(value);
   }
 
-  String _formatOptionLabel(String value, Map<String, String> optionLabels) {
-    final label = optionLabels[value]?.trim();
-    if (label == null || label.isEmpty) {
-      return value;
+  String? _lookupOptionLabel(String value, Map<String, String> optionLabels) {
+    final direct = optionLabels[value]?.trim();
+    if (direct != null && direct.isNotEmpty) {
+      return direct;
     }
-    return "$value ($label)";
+
+    final lowercaseValue = value.toLowerCase();
+    for (final entry in optionLabels.entries) {
+      if (entry.key.toLowerCase() != lowercaseValue) {
+        continue;
+      }
+      final label = entry.value.trim();
+      if (label.isNotEmpty) {
+        return label;
+      }
+    }
+
+    return null;
+  }
+
+  Object? _resolveGroupSubAnswer({
+    required Map<String, dynamic> answers,
+    required String subQuestionId,
+    required int subQuestionIndex,
+  }) {
+    final direct = answers[subQuestionId];
+    if (!_isEmptyAnswer(direct)) {
+      return direct;
+    }
+
+    final lowercaseId = subQuestionId.toLowerCase();
+    for (final entry in answers.entries) {
+      if (entry.key.toLowerCase() != lowercaseId) {
+        continue;
+      }
+      if (!_isEmptyAnswer(entry.value)) {
+        return entry.value;
+      }
+    }
+
+    final fallbackKeys = <String>[
+      "item-${subQuestionIndex + 1}",
+      (subQuestionIndex + 1).toString(),
+      subQuestionIndex.toString(),
+    ];
+
+    for (final key in fallbackKeys) {
+      final fallbackValue = answers[key];
+      if (!_isEmptyAnswer(fallbackValue)) {
+        return fallbackValue;
+      }
+    }
+
+    return null;
+  }
+
+  Widget _buildReviewSection({
+    required BuildContext context,
+    required String label,
+    required Widget child,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
+        color: colorScheme.surface.withValues(alpha: 0.45),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChoiceOptionList(List<AdminQuestionOption> options) {
+    if (options.isEmpty) {
+      return const Text("Opsi jawaban tidak tersedia.");
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        for (final option in options)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: SelectableText("${option.value}. ${option.label}"),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildChoiceQuestionReview({
+    required BuildContext context,
+    required AdminQuestion question,
+    required Object? participantAnswer,
+  }) {
+    final options = _parseChoiceOptions(question.options);
+    final optionLabels = _optionLabelByValue(options);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _buildReviewSection(
+          context: context,
+          label: "Opsi Jawaban",
+          child: _buildChoiceOptionList(options),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        _buildAnswerLine(
+          context: context,
+          label: "Jawaban Peserta",
+          value: _formatChoiceAnswerValue(
+            questionType: question.type,
+            value: participantAnswer,
+            optionLabels: optionLabels,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        _buildAnswerLine(
+          context: context,
+          label: "Kunci Jawaban",
+          value: _formatChoiceAnswerValue(
+            questionType: question.type,
+            value: question.correctAnswer,
+            optionLabels: optionLabels,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGroupSubQuestionCard({
+    required BuildContext context,
+    required int number,
+    required GroupSubQuestion subQuestion,
+    required Object? participantAnswer,
+    required Object? answerKey,
+  }) {
+    final options = _parseChoiceOptions(subQuestion.options);
+    final optionLabels = _optionLabelByValue(options);
+    final typeLabel = subQuestion.type == QuestionType.multi
+        ? "Multi Select"
+        : "Single Select";
+    final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+        );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: Theme.of(context)
+              .colorScheme
+              .outlineVariant
+              .withValues(alpha: 0.6),
+        ),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.55),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text("Sub-soal $number ($typeLabel)", style: titleStyle),
+          const SizedBox(height: AppSpacing.xxs),
+          SelectableText(subQuestion.text),
+          const SizedBox(height: AppSpacing.xs),
+          _buildReviewSection(
+            context: context,
+            label: "Opsi Jawaban",
+            child: _buildChoiceOptionList(options),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          _buildAnswerLine(
+            context: context,
+            label: "Jawaban Peserta",
+            value: _formatChoiceAnswerValue(
+              questionType: subQuestion.type,
+              value: participantAnswer,
+              optionLabels: optionLabels,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          _buildAnswerLine(
+            context: context,
+            label: "Kunci Jawaban",
+            value: _formatChoiceAnswerValue(
+              questionType: subQuestion.type,
+              value: answerKey,
+              optionLabels: optionLabels,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroupQuestionReview({
+    required BuildContext context,
+    required AdminQuestion question,
+    required Object? participantAnswer,
+  }) {
+    final parentText = extractGroupParentText(question.options)?.trim();
+    final subQuestions = extractGroupSubQuestions(question.options);
+    final participantAnswers = normalizeGroupAnswerMap(participantAnswer);
+    final answerKeys = normalizeGroupAnswerMap(question.correctAnswer);
+
+    if (subQuestions.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _buildAnswerLine(
+            context: context,
+            label: "Jawaban Peserta",
+            value: _formatAnswerValue(question, participantAnswer),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          _buildAnswerLine(
+            context: context,
+            label: "Kunci Jawaban",
+            value: _formatAnswerValue(question, question.correctAnswer),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (parentText != null && parentText.isNotEmpty) ...<Widget>[
+          _buildReviewSection(
+            context: context,
+            label: "Konteks Group",
+            child: SelectableText(parentText),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+        for (var i = 0; i < subQuestions.length; i++) ...<Widget>[
+          _buildGroupSubQuestionCard(
+            context: context,
+            number: i + 1,
+            subQuestion: subQuestions[i],
+            participantAnswer: _resolveGroupSubAnswer(
+              answers: participantAnswers,
+              subQuestionId: subQuestions[i].id,
+              subQuestionIndex: i,
+            ),
+            answerKey: _resolveGroupSubAnswer(
+              answers: answerKeys,
+              subQuestionId: subQuestions[i].id,
+              subQuestionIndex: i,
+            ),
+          ),
+          if (i < subQuestions.length - 1)
+            const SizedBox(height: AppSpacing.xs),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildQuestionReviewContent({
+    required BuildContext context,
+    required AdminQuestion question,
+    required AdminAttemptAnswer? answer,
+  }) {
+    if (question.type == QuestionType.group) {
+      return _buildGroupQuestionReview(
+        context: context,
+        question: question,
+        participantAnswer: answer?.answer,
+      );
+    }
+
+    return _buildChoiceQuestionReview(
+      context: context,
+      question: question,
+      participantAnswer: answer?.answer,
+    );
   }
 
   String _formatRawValue(Object? value) {
@@ -665,19 +1045,14 @@ class _AdminAnswerReviewDialogState
   }
 
   Widget _buildAnswerLine({
+    required BuildContext context,
     required String label,
     required String value,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 2),
-        SelectableText(value),
-      ],
+    return _buildReviewSection(
+      context: context,
+      label: label,
+      child: SelectableText(value),
     );
   }
 
@@ -792,15 +1167,18 @@ class _AdminAnswerReviewDialogState
                         const SizedBox(height: AppSpacing.xs),
                         SelectableText(question.text),
                         const SizedBox(height: AppSpacing.sm),
-                        _buildAnswerLine(
-                          label: "Jawaban Peserta",
-                          value: _formatAnswerValue(question, answer?.answer),
+                        Text(
+                          "Tipe: ${adminQuestionTypeLabel(question.type)}",
+                          style:
+                              Theme.of(context).textTheme.labelLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
                         ),
                         const SizedBox(height: AppSpacing.xs),
-                        _buildAnswerLine(
-                          label: "Kunci Jawaban",
-                          value: _formatAnswerValue(
-                              question, question.correctAnswer),
+                        _buildQuestionReviewContent(
+                          context: context,
+                          question: question,
+                          answer: answer,
                         ),
                       ],
                     ),
@@ -837,6 +1215,9 @@ class _AdminAudioChunkDialog extends ConsumerStatefulWidget {
 
 class _AdminAudioChunkDialogState
     extends ConsumerState<_AdminAudioChunkDialog> {
+  static const int _prefetchChunkCount = 2;
+  static const int _chunkCacheRetainBehind = 2;
+
   late Future<List<AttemptAudioChunk>> _chunksFuture;
   final AudioPlayer _player = AudioPlayer();
   final Map<String, String> _cachedChunkFiles = <String, String>{};
@@ -915,11 +1296,6 @@ class _AdminAudioChunkDialogState
     });
 
     try {
-      await _prepareChunkFiles(orderedChunks);
-      if (!mounted) {
-        return;
-      }
-
       await _player.stop();
       if (!mounted) {
         return;
@@ -957,12 +1333,6 @@ class _AdminAudioChunkDialogState
     }
   }
 
-  Future<void> _prepareChunkFiles(List<AttemptAudioChunk> chunks) async {
-    for (final chunk in chunks) {
-      await _resolveLocalChunkFile(chunk);
-    }
-  }
-
   Future<void> _playChunkFromQueue(int index) async {
     if (index < 0 || index >= _playbackQueue.length) {
       return;
@@ -979,6 +1349,9 @@ class _AdminAudioChunkDialogState
     setState(() {
       _playbackIndex = index;
     });
+
+    _evictOldCachedChunks(currentIndex: index);
+    unawaited(_prefetchUpcomingChunks(startIndex: index + 1));
   }
 
   Future<void> _playNextChunkInQueue() async {
@@ -1026,6 +1399,47 @@ class _AdminAudioChunkDialogState
       _playbackQueue = const <AttemptAudioChunk>[];
       _playbackIndex = -1;
     });
+  }
+
+  Future<void> _prefetchUpcomingChunks({required int startIndex}) async {
+    if (startIndex < 0 || startIndex >= _playbackQueue.length) {
+      return;
+    }
+
+    final endExclusive =
+        (startIndex + _prefetchChunkCount).clamp(0, _playbackQueue.length);
+    for (var i = startIndex; i < endExclusive; i++) {
+      final chunk = _playbackQueue[i];
+      if (_cachedChunkFiles.containsKey(chunk.id)) {
+        continue;
+      }
+      try {
+        await _resolveLocalChunkFile(chunk);
+      } catch (_) {
+        // Prefetch bersifat best effort.
+      }
+    }
+  }
+
+  void _evictOldCachedChunks({required int currentIndex}) {
+    final minKeepIndex = currentIndex - _chunkCacheRetainBehind;
+    if (minKeepIndex < 0 || _playbackQueue.isEmpty) {
+      return;
+    }
+
+    for (var i = 0; i < minKeepIndex && i < _playbackQueue.length; i++) {
+      final chunk = _playbackQueue[i];
+      final filePath = _cachedChunkFiles.remove(chunk.id);
+      if (filePath == null) {
+        continue;
+      }
+      final file = File(filePath);
+      if (file.existsSync()) {
+        try {
+          file.deleteSync();
+        } catch (_) {}
+      }
+    }
   }
 
   Future<String> _resolveLocalChunkFile(AttemptAudioChunk chunk) async {
