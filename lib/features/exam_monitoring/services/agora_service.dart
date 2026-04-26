@@ -34,6 +34,7 @@ class AgoraService {
   String? _appId;
   String? _channelName;
   int? _localUid;
+  String? _joinToken;
   bool _isInitialized = false;
   bool _isJoined = false;
 
@@ -78,6 +79,7 @@ class AgoraService {
       _isJoined = false;
       _channelName = null;
       _localUid = null;
+      _joinToken = null;
       connectionState.value = AgoraServiceConnectionState.idle;
       remoteUids.value = <int>{};
     } catch (error, stackTrace) {
@@ -125,7 +127,9 @@ class AgoraService {
       );
     }
 
+    final normalizedToken = _normalizeToken(token);
     if (_isJoined && _channelName == trimmedChannel && _localUid == uid) {
+      await renewToken(normalizedToken);
       return;
     }
 
@@ -146,7 +150,7 @@ class AgoraService {
         await engine.startPreview();
       }
       await engine.joinChannel(
-        token: token?.trim().isNotEmpty == true ? token!.trim() : '',
+        token: normalizedToken ?? '',
         channelId: trimmedChannel,
         uid: uid,
         options: ChannelMediaOptions(
@@ -161,6 +165,7 @@ class AgoraService {
 
       _channelName = trimmedChannel;
       _localUid = uid;
+      _joinToken = normalizedToken;
       _isJoined = true;
       connectionState.value = AgoraServiceConnectionState.connected;
     } catch (error, stackTrace) {
@@ -196,8 +201,36 @@ class AgoraService {
       _isJoined = false;
       _channelName = null;
       _localUid = null;
+      _joinToken = null;
       remoteUids.value = <int>{};
       connectionState.value = AgoraServiceConnectionState.disconnected;
+    }
+  }
+
+  Future<void> renewToken(String? token) async {
+    final normalizedToken = _normalizeToken(token);
+    if (normalizedToken == null) {
+      return;
+    }
+
+    final engine = _engine;
+    if (!_isInitialized || engine == null || !_isJoined) {
+      return;
+    }
+    if (_joinToken == normalizedToken) {
+      return;
+    }
+
+    try {
+      await engine.renewToken(normalizedToken);
+      _joinToken = normalizedToken;
+    } catch (error, stackTrace) {
+      throw ServiceException(
+        'Gagal memperbarui token Agora.',
+        code: 'agora.renew_token_failed',
+        cause: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -305,6 +338,7 @@ class AgoraService {
       _isJoined = false;
       _channelName = null;
       _localUid = null;
+      _joinToken = null;
       remoteUids.value = <int>{};
       connectionState.value = AgoraServiceConnectionState.idle;
       return;
@@ -335,6 +369,7 @@ class AgoraService {
     _isJoined = false;
     _channelName = null;
     _localUid = null;
+    _joinToken = null;
     remoteUids.value = <int>{};
     connectionState.value = AgoraServiceConnectionState.idle;
   }
@@ -393,5 +428,13 @@ class AgoraService {
       return;
     }
     _errorController.add(exception);
+  }
+
+  String? _normalizeToken(String? token) {
+    final normalized = token?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+    return normalized;
   }
 }

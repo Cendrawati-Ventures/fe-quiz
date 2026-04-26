@@ -347,14 +347,18 @@ class _StudentMonitoringCardState extends State<_StudentMonitoringCard> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.attempt.monitoring.agoraChannel !=
             widget.attempt.monitoring.agoraChannel ||
-        oldWidget.attempt.monitoring.agoraToken !=
-            widget.attempt.monitoring.agoraToken ||
         oldWidget.attempt.monitoring.agoraUid !=
             widget.attempt.monitoring.agoraUid ||
         oldWidget.attempt.monitoring.agoraAppId !=
             widget.attempt.monitoring.agoraAppId) {
       unawaited(_controller.close());
       unawaited(_startWatching());
+      return;
+    }
+
+    if (oldWidget.attempt.monitoring.agoraToken !=
+        widget.attempt.monitoring.agoraToken) {
+      unawaited(_controller.renewToken(widget.attempt.monitoring.agoraToken));
     }
   }
 

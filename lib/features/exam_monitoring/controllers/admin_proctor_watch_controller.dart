@@ -35,7 +35,13 @@ class AdminProctorWatchController extends ChangeNotifier {
     required int uid,
     String? token,
   }) async {
-    if (_isStarting || (_isReady && _channelName == channelName)) {
+    if (_isStarting) {
+      return;
+    }
+    if (_isReady &&
+        _channelName == channelName &&
+        _agoraService.localUid == uid) {
+      await renewToken(token);
       return;
     }
 
@@ -74,6 +80,18 @@ class AdminProctorWatchController extends ChangeNotifier {
       _isReady = false;
     } finally {
       _isStarting = false;
+      _safeNotify();
+    }
+  }
+
+  Future<void> renewToken(String? token) async {
+    try {
+      await _agoraService.renewToken(token);
+    } on ServiceException catch (error) {
+      _errorMessage = error.message;
+      _safeNotify();
+    } catch (_) {
+      _errorMessage = 'Gagal memperbarui token ruang pengawasan.';
       _safeNotify();
     }
   }

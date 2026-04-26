@@ -17,6 +17,14 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+
+    tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
+        sourceCompatibility = JavaVersion.VERSION_17.toString()
+        targetCompatibility = JavaVersion.VERSION_17.toString()
+        if ("-Xlint:-options" !in options.compilerArgs) {
+            options.compilerArgs.add("-Xlint:-options")
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {
