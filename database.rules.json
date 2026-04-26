@@ -1,0 +1,37 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "examSessions": {
+      "$sessionId": {
+        "students": {
+          "$studentId": {
+            ".read": true,
+            ".write": "newData.hasChildren(['name', 'status', 'lastSeen', 'violations', 'device', 'connection']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 120 && newData.child('status').isString() && newData.child('status').val().matches(/^(ACTIVE|LEFT_APP|OFFLINE|FINISHED)$/) && (newData.child('lastSeen').isNumber() || newData.child('lastSeen').child('.sv').val() == 'timestamp') && newData.child('violations').isNumber() && newData.child('violations').val() >= 0 && newData.child('violations').val() <= 1000 && newData.child('device').isString() && newData.child('device').val().length > 0 && newData.child('device').val().length <= 80 && newData.child('connection').isBoolean()",
+            "name": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
+            },
+            "status": {
+              ".validate": "newData.isString() && newData.val().matches(/^(ACTIVE|LEFT_APP|OFFLINE|FINISHED)$/)"
+            },
+            "lastSeen": {
+              ".validate": "newData.isNumber() || newData.child('.sv').val() == 'timestamp'"
+            },
+            "violations": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000"
+            },
+            "device": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80"
+            },
+            "connection": {
+              ".validate": "newData.isBoolean()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      }
+    }
+  }
+}

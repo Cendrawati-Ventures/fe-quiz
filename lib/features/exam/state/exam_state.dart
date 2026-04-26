@@ -279,6 +279,7 @@ class ExamSessionState {
     this.exam,
     this.subject,
     this.attempt,
+    this.monitoring,
     this.questions = const <ApiQuestion>[],
     this.currentQuestionIndex = 0,
     this.answersByQuestionId = const <String, dynamic>{},
@@ -299,6 +300,7 @@ class ExamSessionState {
   final ApiExam? exam;
   final ApiSubject? subject;
   final ApiAttempt? attempt;
+  final AttemptMonitoringConfig? monitoring;
   final List<ApiQuestion> questions;
   final int currentQuestionIndex;
   final Map<String, dynamic> answersByQuestionId;
@@ -374,6 +376,8 @@ class ExamSessionState {
     ApiExam? exam,
     ApiSubject? subject,
     ApiAttempt? attempt,
+    AttemptMonitoringConfig? monitoring,
+    bool clearMonitoring = false,
     List<ApiQuestion>? questions,
     int? currentQuestionIndex,
     Map<String, dynamic>? answersByQuestionId,
@@ -398,6 +402,7 @@ class ExamSessionState {
       exam: exam ?? this.exam,
       subject: subject ?? this.subject,
       attempt: attempt ?? this.attempt,
+      monitoring: clearMonitoring ? null : (monitoring ?? this.monitoring),
       questions: questions ?? this.questions,
       currentQuestionIndex: currentQuestionIndex ?? this.currentQuestionIndex,
       answersByQuestionId: answersByQuestionId ?? this.answersByQuestionId,
@@ -425,6 +430,7 @@ class ExamSessionState {
       'exam': exam?.toJson(),
       'subject': subject?.toJson(),
       'attempt': attempt?.toJson(),
+      'monitoring': monitoring?.toJson(),
       'questions': questions.map((question) => question.toJson()).toList(),
       'currentQuestionIndex': currentQuestionIndex,
       'answersByQuestionId': answersByQuestionId,
@@ -463,6 +469,11 @@ class ExamSessionState {
       attempt: (json['attempt'] as Map<String, dynamic>?) == null
           ? null
           : ApiAttempt.fromJson(json['attempt'] as Map<String, dynamic>),
+      monitoring: (json['monitoring'] as Map<String, dynamic>?) == null
+          ? null
+          : AttemptMonitoringConfig.fromJson(
+              json['monitoring'] as Map<String, dynamic>,
+            ),
       questions: rawQuestions,
       currentQuestionIndex: json['currentQuestionIndex'] as int? ?? 0,
       answersByQuestionId: rawAnswers,
@@ -481,8 +492,7 @@ class ExamSessionState {
       ),
       serverOffsetMs: json['serverOffsetMs'] as int? ?? 0,
       remainingSeconds: json['remainingSeconds'] as int? ?? 0,
-      serverDeadlineEpochMs:
-          (json['serverDeadlineEpochMs'] as num?)?.toInt(),
+      serverDeadlineEpochMs: (json['serverDeadlineEpochMs'] as num?)?.toInt(),
       latestResult: (json['latestResult'] as Map<String, dynamic>?) == null
           ? null
           : ResultResponse.fromJson(
@@ -540,6 +550,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
   }) async {
     state = state.copyWith(
       isLoading: true,
+      clearMonitoring: true,
       clearErrorMessage: true,
       clearWarningMessage: true,
       clearLatestResult: true,
@@ -561,6 +572,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
         exam: null,
         subject: subject,
         attempt: response.attempt,
+        monitoring: response.monitoring,
         questions: response.questions,
         currentQuestionIndex: 0,
         answersByQuestionId: <String, dynamic>{},
@@ -629,6 +641,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
 
       state = state.copyWith(
         attempt: detail.attempt,
+        monitoring: detail.monitoring ?? state.monitoring,
         questions: questions,
         answersByQuestionId: answers,
         serverOffsetMs: _serverOffsetFrom(detail.serverNow),
@@ -694,6 +707,18 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
 
   void onUserInteraction() {
     _idleService?.reset();
+  }
+
+  Future<void> reportProctoringSignal({
+    required ProctoringEventType type,
+    int value = 100,
+    String? warning,
+  }) async {
+    await _enqueueProctoringEvent(
+      type: type,
+      value: value,
+      warning: warning,
+    );
   }
 
   void nextQuestion() {
@@ -963,8 +988,8 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       ..add(event);
     final cappedBuffer =
         buffer.length > 100 ? buffer.sublist(buffer.length - 100) : buffer;
-      state = state.copyWith(
-        proctoringBuffer: cappedBuffer,
+    state = state.copyWith(
+      proctoringBuffer: cappedBuffer,
       warningMessage: warning,
       syncStatus: SyncStatus.pending,
     );
@@ -1182,7 +1207,8 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     }
 
     final startedAt = attempt.startTime.toUtc();
-    final byDuration = startedAt.add(Duration(minutes: subject.durationMinutes));
+    final byDuration =
+        startedAt.add(Duration(minutes: subject.durationMinutes));
     final closeAt = subject.closeAt?.toUtc();
     final hardDeadline =
         closeAt != null && closeAt.isBefore(byDuration) ? closeAt : byDuration;
@@ -1217,6 +1243,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     }
 
     final safeRemainingSeconds = max(0, remainingSeconds);
-    return serverNow.toUtc().millisecondsSinceEpoch + safeRemainingSeconds * 1000;
+    return serverNow.toUtc().millisecondsSinceEpoch +
+        safeRemainingSeconds * 1000;
   }
 }

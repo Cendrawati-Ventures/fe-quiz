@@ -18,6 +18,7 @@ import '../features/exam/presentation/exam_list_screen.dart';
 import '../features/exam/presentation/exam_screen.dart';
 import '../features/exam/presentation/result_screen.dart';
 import '../features/exam/state/exam_state.dart';
+import '../features/exam_monitoring/presentation/student_exam_gate_screen.dart';
 import 'route_guard.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -50,6 +51,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/exam/session',
         name: 'exam-session',
         builder: (context, state) => const ExamScreen(),
+      ),
+      GoRoute(
+        path: '/exam/session/monitoring',
+        name: 'exam-monitoring',
+        builder: (context, state) => const StudentExamGateScreen(),
       ),
       GoRoute(
         path: '/result',

@@ -1,0 +1,24 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "quiz-q-ta",
+          "appId": "1:637225767851:android:b9e7efa85ce3ad9a8a78ee",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "quiz-q-ta",
+          "configurations": {
+            "android": "1:637225767851:android:b9e7efa85ce3ad9a8a78ee"
+          }
+        }
+      }
+    }
+  },
+  "database": {
+    "rules": "database.rules.json"
+  }
+}

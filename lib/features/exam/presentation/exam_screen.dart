@@ -46,6 +46,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   String? _audioCaptureAttemptId;
   DateTime? _audioChunkStartedAt;
   int _nextAudioChunkIndex = 0;
+  String? _monitoringBootstrappedAttemptId;
+  bool _isOpeningMonitoringRoute = false;
 
   @override
   void initState() {
@@ -68,6 +70,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     ref.listen<ExamSessionState>(examSessionProvider, (previous, next) {
       _syncBackgroundMusic(next);
       _syncAudioCapture(next);
+      _syncMonitoringBootstrap(next);
 
       if (previous?.submitState != SubmitState.success &&
           next.submitState == SubmitState.success &&
@@ -98,6 +101,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     final currentIndex = state.currentQuestionIndex;
     _syncBackgroundMusic(state);
     _syncAudioCapture(state);
+    _syncMonitoringBootstrap(state);
 
     if (!state.hasActiveAttempt &&
         state.submitState == SubmitState.success &&
@@ -176,6 +180,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         );
 
         if (confirmed == true && context.mounted) {
+          await notifier.reportProctoringSignal(
+            type: ProctoringEventType.tabSwitch,
+            value: 100,
+            warning: 'Kamu keluar dari layar ujian.',
+          );
           await _stopAudioCapture(uploadFinalChunk: true);
           if (!context.mounted) {
             return;
@@ -190,6 +199,18 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
           appBar: AppBar(
             title: Text(state.subject?.name ?? state.exam?.title ?? 'Ujian'),
             actions: <Widget>[
+              IconButton(
+                tooltip: 'Monitoring',
+                onPressed: () {
+                  unawaited(
+                    _openMonitoringRoute(
+                      sessionState: state,
+                      showConfigurationError: true,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.videocam_rounded),
+              ),
               Padding(
                 padding: const EdgeInsets.only(right: AppSpacing.md),
                 child: Center(
@@ -473,6 +494,64 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
   Future<void> _disableSecureFlag() async {
     await ScreenSecurity.disableSecureFlag();
+  }
+
+  void _syncMonitoringBootstrap(ExamSessionState state) {
+    final attempt = state.attempt;
+    if (!state.hasActiveAttempt || attempt == null) {
+      _monitoringBootstrappedAttemptId = null;
+      return;
+    }
+
+    if (_monitoringBootstrappedAttemptId == attempt.id) {
+      return;
+    }
+
+    final monitoring = state.monitoring;
+    if (monitoring == null || !monitoring.enabled) {
+      return;
+    }
+
+    _monitoringBootstrappedAttemptId = attempt.id;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(
+        _openMonitoringRoute(
+          sessionState: state,
+          showConfigurationError: false,
+        ),
+      );
+    });
+  }
+
+  Future<void> _openMonitoringRoute({
+    required ExamSessionState sessionState,
+    required bool showConfigurationError,
+  }) async {
+    if (_isOpeningMonitoringRoute || !mounted) {
+      return;
+    }
+
+    final monitoring = sessionState.monitoring;
+    if (monitoring == null || !monitoring.enabled) {
+      if (showConfigurationError) {
+        final message = monitoring?.reason ??
+            'Konfigurasi monitoring belum siap untuk sesi ini.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+      return;
+    }
+
+    _isOpeningMonitoringRoute = true;
+    try {
+      await context.push('/exam/session/monitoring');
+    } finally {
+      _isOpeningMonitoringRoute = false;
+    }
   }
 
   void _syncAudioCapture(ExamSessionState state) {

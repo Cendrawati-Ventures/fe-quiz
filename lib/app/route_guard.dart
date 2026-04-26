@@ -10,7 +10,8 @@ String? authRedirect(Ref ref, GoRouterState state) {
   final path = state.matchedLocation;
   final isLoginRoute = path == '/login';
   final isAdminRoute = path.startsWith('/admin');
-  final isExamSessionRoute = path == '/exam/session';
+  final isExamSessionRoute =
+      path == '/exam/session' || path == '/exam/session/monitoring';
 
   if (authState.status == AuthStatus.checking) {
     return null;

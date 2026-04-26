@@ -497,16 +497,80 @@ class ApiAttempt {
   }
 }
 
+class AttemptMonitoringConfig {
+  const AttemptMonitoringConfig({
+    required this.enabled,
+    required this.provider,
+    required this.reason,
+    required this.agoraAppId,
+    required this.agoraChannel,
+    required this.agoraUid,
+    required this.agoraToken,
+    required this.agoraTokenExpiresAt,
+    required this.firebasePath,
+    required this.firebaseDatabaseUrl,
+    required this.firebaseProjectId,
+  });
+
+  final bool enabled;
+  final String provider;
+  final String? reason;
+  final String? agoraAppId;
+  final String? agoraChannel;
+  final int? agoraUid;
+  final String? agoraToken;
+  final DateTime? agoraTokenExpiresAt;
+  final String? firebasePath;
+  final String? firebaseDatabaseUrl;
+  final String? firebaseProjectId;
+
+  factory AttemptMonitoringConfig.fromJson(Map<String, dynamic> json) {
+    return AttemptMonitoringConfig(
+      enabled: json['enabled'] as bool? ?? false,
+      provider: json['provider'] as String? ?? 'agora',
+      reason: json['reason'] as String?,
+      agoraAppId: json['agoraAppId'] as String?,
+      agoraChannel: json['agoraChannel'] as String?,
+      agoraUid: (json['agoraUid'] as num?)?.toInt(),
+      agoraToken: json['agoraToken'] as String?,
+      agoraTokenExpiresAt: (json['agoraTokenExpiresAt'] as String?) == null
+          ? null
+          : DateTime.parse(json['agoraTokenExpiresAt'] as String),
+      firebasePath: json['firebasePath'] as String?,
+      firebaseDatabaseUrl: json['firebaseDatabaseUrl'] as String?,
+      firebaseProjectId: json['firebaseProjectId'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'enabled': enabled,
+      'provider': provider,
+      'reason': reason,
+      'agoraAppId': agoraAppId,
+      'agoraChannel': agoraChannel,
+      'agoraUid': agoraUid,
+      'agoraToken': agoraToken,
+      'agoraTokenExpiresAt': agoraTokenExpiresAt?.toIso8601String(),
+      'firebasePath': firebasePath,
+      'firebaseDatabaseUrl': firebaseDatabaseUrl,
+      'firebaseProjectId': firebaseProjectId,
+    };
+  }
+}
+
 class StartAttemptResponse {
   const StartAttemptResponse({
     required this.attempt,
     required this.questions,
+    this.monitoring,
     this.serverNow,
     this.remainingSeconds,
   });
 
   final ApiAttempt attempt;
   final List<ApiQuestion> questions;
+  final AttemptMonitoringConfig? monitoring;
   final DateTime? serverNow;
   final int? remainingSeconds;
 
@@ -517,6 +581,11 @@ class StartAttemptResponse {
     return StartAttemptResponse(
       attempt: ApiAttempt.fromJson(json['attempt'] as Map<String, dynamic>),
       questions: rawQuestions.map(ApiQuestion.fromJson).toList(),
+      monitoring: (json['monitoring'] as Map<String, dynamic>?) == null
+          ? null
+          : AttemptMonitoringConfig.fromJson(
+              json['monitoring'] as Map<String, dynamic>,
+            ),
       serverNow: (json['serverNow'] as String?) == null
           ? null
           : DateTime.parse(json['serverNow'] as String),
@@ -880,12 +949,14 @@ class AttemptDetail {
   const AttemptDetail({
     required this.attempt,
     required this.answers,
+    this.monitoring,
     this.serverNow,
     this.remainingSeconds,
   });
 
   final ApiAttempt attempt;
   final List<AttemptAnswer> answers;
+  final AttemptMonitoringConfig? monitoring;
   final DateTime? serverNow;
   final int? remainingSeconds;
 
@@ -908,6 +979,11 @@ class AttemptDetail {
     return AttemptDetail(
       attempt: attempt,
       answers: answers,
+      monitoring: (json['monitoring'] as Map<String, dynamic>?) == null
+          ? null
+          : AttemptMonitoringConfig.fromJson(
+              json['monitoring'] as Map<String, dynamic>,
+            ),
       serverNow: (json['serverNow'] as String?) == null
           ? null
           : DateTime.parse(json['serverNow'] as String),
