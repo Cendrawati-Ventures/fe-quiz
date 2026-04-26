@@ -410,6 +410,26 @@ class ExamService {
     }
   }
 
+  Future<List<ActiveMonitoringAttempt>> listActiveMonitoringAttempts() async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/attempts/active-monitoring',
+        options: _readOptions(),
+      );
+      final data = response.data;
+      if (data is List<dynamic>) {
+        return data
+            .whereType<Map<String, dynamic>>()
+            .map(ActiveMonitoringAttempt.fromJson)
+            .where((item) => item.attemptId.trim().isNotEmpty)
+            .toList();
+      }
+      throw ApiError(message: 'Data standby pengawas belum bisa dimuat.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
   Future<SaveAnswerResponse> saveAnswer({
     required String attemptId,
     required String questionId,

@@ -18,6 +18,9 @@ import '../../../shared/components/progress_bar.dart';
 import '../../../shared/components/question_card.dart';
 import '../../../shared/components/timer_widget.dart';
 import '../../../shared/components/warning_banner.dart';
+import '../../auth/model/auth_user.dart';
+import '../../auth/state/auth_provider.dart';
+import '../../exam_monitoring/state/student_monitoring_state.dart';
 import '../model/exam_models.dart';
 import '../state/exam_state.dart';
 
@@ -37,6 +40,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
   bool _isSubmitFailureDialogVisible = false;
   BuildContext? _submitFailureDialogContext;
+  bool _isExitBlockedDialogVisible = false;
   AudioPlayer? _backgroundMusicPlayer;
   String? _playingAttemptId;
   bool _isBackgroundMusicSyncing = false;
@@ -46,8 +50,6 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   String? _audioCaptureAttemptId;
   DateTime? _audioChunkStartedAt;
   int _nextAudioChunkIndex = 0;
-  String? _monitoringBootstrappedAttemptId;
-  bool _isOpeningMonitoringRoute = false;
 
   @override
   void initState() {
@@ -67,10 +69,12 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final monitoringSession = ref.read(studentMonitoringSessionProvider);
+    final authUser = ref.watch(authProvider.select((value) => value.user));
     ref.listen<ExamSessionState>(examSessionProvider, (previous, next) {
       _syncBackgroundMusic(next);
       _syncAudioCapture(next);
-      _syncMonitoringBootstrap(next);
+      _syncStudentMonitoring(next, user: authUser);
 
       if (previous?.submitState != SubmitState.success &&
           next.submitState == SubmitState.success &&
@@ -78,6 +82,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         _dismissSubmitFailureDialog();
         unawaited(_stopAudioCapture(uploadFinalChunk: true));
         _stopBackgroundMusic();
+        unawaited(monitoringSession.stop(markFinished: true));
         ref.invalidate(myResultsProvider);
         context.go('/result');
         return;
@@ -101,7 +106,21 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     final currentIndex = state.currentQuestionIndex;
     _syncBackgroundMusic(state);
     _syncAudioCapture(state);
-    _syncMonitoringBootstrap(state);
+    _syncStudentMonitoring(state, user: authUser);
+
+    if (state.hasActiveAttempt && !state.monitoringPrecheckConfirmed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        context.go('/exam/session/precheck');
+      });
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     if (!state.hasActiveAttempt &&
         state.submitState == SubmitState.success &&
@@ -157,40 +176,12 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (_, __) async {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              title: const Text('Keluar dari ujian?'),
-              content: const Text(
-                'Jawaban tetap tersimpan, tetapi sistem akan mencatat aktivitas keluar aplikasi.',
-              ),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Batal'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Keluar'),
-                ),
-              ],
-            );
-          },
+        await notifier.reportProctoringSignal(
+          type: ProctoringEventType.tabSwitch,
+          value: 100,
+          warning: 'Menekan tombol kembali saat ujian sedang berlangsung.',
         );
-
-        if (confirmed == true && context.mounted) {
-          await notifier.reportProctoringSignal(
-            type: ProctoringEventType.tabSwitch,
-            value: 100,
-            warning: 'Kamu keluar dari layar ujian.',
-          );
-          await _stopAudioCapture(uploadFinalChunk: true);
-          if (!context.mounted) {
-            return;
-          }
-          context.go('/exam');
-        }
+        await _showExitBlockedDialog();
       },
       child: Listener(
         behavior: HitTestBehavior.translucent,
@@ -199,18 +190,6 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
           appBar: AppBar(
             title: Text(state.subject?.name ?? state.exam?.title ?? 'Ujian'),
             actions: <Widget>[
-              IconButton(
-                tooltip: 'Monitoring',
-                onPressed: () {
-                  unawaited(
-                    _openMonitoringRoute(
-                      sessionState: state,
-                      showConfigurationError: true,
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.videocam_rounded),
-              ),
               Padding(
                 padding: const EdgeInsets.only(right: AppSpacing.md),
                 child: Center(
@@ -488,6 +467,37 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     _submitFailureDialogContext = null;
   }
 
+  Future<void> _showExitBlockedDialog() async {
+    if (_isExitBlockedDialogVisible || !mounted) {
+      return;
+    }
+    _isExitBlockedDialogVisible = true;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            title: const Text('Ujian Sedang Berlangsung'),
+            content: const Text(
+              'Tombol kembali dinonaktifkan selama ujian berjalan. Silakan lanjutkan mengerjakan ujian.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Lanjut Kerjakan'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    _isExitBlockedDialogVisible = false;
+  }
+
   Future<void> _enableSecureFlag() async {
     await ScreenSecurity.enableSecureFlag();
   }
@@ -496,62 +506,29 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     await ScreenSecurity.disableSecureFlag();
   }
 
-  void _syncMonitoringBootstrap(ExamSessionState state) {
-    final attempt = state.attempt;
-    if (!state.hasActiveAttempt || attempt == null) {
-      _monitoringBootstrappedAttemptId = null;
+  void _syncStudentMonitoring(
+    ExamSessionState state, {
+    AuthUser? user,
+  }) {
+    final monitoringSession = ref.read(studentMonitoringSessionProvider);
+    if (!state.hasActiveAttempt) {
+      unawaited(monitoringSession.stop(markFinished: false));
       return;
     }
 
-    if (_monitoringBootstrappedAttemptId == attempt.id) {
+    if (state.submitState == SubmitState.success) {
       return;
     }
 
-    final monitoring = state.monitoring;
-    if (monitoring == null || !monitoring.enabled) {
+    final config = resolveStudentMonitoringConfig(
+      user: user,
+      sessionState: state,
+    );
+    if (config == null) {
       return;
     }
 
-    _monitoringBootstrappedAttemptId = attempt.id;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      unawaited(
-        _openMonitoringRoute(
-          sessionState: state,
-          showConfigurationError: false,
-        ),
-      );
-    });
-  }
-
-  Future<void> _openMonitoringRoute({
-    required ExamSessionState sessionState,
-    required bool showConfigurationError,
-  }) async {
-    if (_isOpeningMonitoringRoute || !mounted) {
-      return;
-    }
-
-    final monitoring = sessionState.monitoring;
-    if (monitoring == null || !monitoring.enabled) {
-      if (showConfigurationError) {
-        final message = monitoring?.reason ??
-            'Konfigurasi monitoring belum siap untuk sesi ini.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
-      }
-      return;
-    }
-
-    _isOpeningMonitoringRoute = true;
-    try {
-      await context.push('/exam/session/monitoring');
-    } finally {
-      _isOpeningMonitoringRoute = false;
-    }
+    unawaited(monitoringSession.ensureStarted(config));
   }
 
   void _syncAudioCapture(ExamSessionState state) {

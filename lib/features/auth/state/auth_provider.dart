@@ -7,6 +7,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_error.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../exam/state/exam_state.dart';
+import '../../exam_monitoring/state/student_monitoring_state.dart';
 import '../model/auth_user.dart';
 import '../model/login_request.dart';
 import '../service/auth_service.dart';
@@ -59,10 +60,15 @@ final authProvider = NotifierProvider<AuthNotifier, AuthState>(
 );
 
 class AuthNotifier extends Notifier<AuthState> {
+  static const Duration _sessionValidationInterval = Duration(seconds: 10);
+
   late final AuthService _service;
   late final AppSecureStorage _secureStorage;
   late final ApiClient _apiClient;
   StreamSubscription<AuthEvent>? _authEventSubscription;
+  Timer? _sessionValidationTimer;
+  bool _isSessionValidationRunning = false;
+  bool _isInvalidatingSession = false;
 
   @override
   AuthState build() {
@@ -76,26 +82,105 @@ class AuthNotifier extends Notifier<AuthState> {
       if (event != AuthEvent.unauthorized) {
         return;
       }
-      _apiClient.setAuthToken(null);
-      ref.invalidate(examListProvider);
-      ref.invalidate(subjectListProvider);
-      ref.invalidate(myResultsProvider);
-      ref.invalidate(adminResultsProvider);
-      state = const AuthState(status: AuthStatus.unauthenticated);
-      Future<void>(() async {
-        await ref.read(examSessionProvider.notifier).clearSession();
-      });
+      unawaited(_invalidateSession());
     });
+    _startSessionValidationTimer();
 
     ref.onDispose(() {
       _authEventSubscription?.cancel();
       _authEventSubscription = null;
+      _sessionValidationTimer?.cancel();
+      _sessionValidationTimer = null;
     });
 
     Future<void>(() async {
       await _restoreSession();
     });
     return const AuthState(status: AuthStatus.checking);
+  }
+
+  void _startSessionValidationTimer() {
+    _sessionValidationTimer?.cancel();
+    _sessionValidationTimer = Timer.periodic(_sessionValidationInterval, (_) {
+      unawaited(_validateSessionInBackground());
+    });
+  }
+
+  Future<void> _validateSessionInBackground() async {
+    if (_isSessionValidationRunning ||
+        state.status != AuthStatus.authenticated ||
+        state.user == null) {
+      return;
+    }
+
+    _isSessionValidationRunning = true;
+    try {
+      final me = await _service.me();
+      await _secureStorage.saveUser(me);
+      if (!_isSameUser(state.user, me)) {
+        state = state.copyWith(user: me, clearError: true);
+      }
+    } on ApiError catch (error) {
+      if (_shouldInvalidateSession(error)) {
+        await _invalidateSession();
+      }
+    } catch (_) {
+      // Keep current session when the background sync fails unexpectedly.
+    } finally {
+      _isSessionValidationRunning = false;
+    }
+  }
+
+  bool _isSameUser(AuthUser? current, AuthUser next) {
+    if (current == null) {
+      return false;
+    }
+    return current.id == next.id &&
+        current.username == next.username &&
+        current.displayName == next.displayName &&
+        current.fullName == next.fullName &&
+        current.classId == next.classId &&
+        current.className == next.className &&
+        current.rollNumber == next.rollNumber &&
+        current.role == next.role;
+  }
+
+  bool _shouldInvalidateSession(ApiError error) {
+    final statusCode = error.statusCode;
+    if (statusCode == 401 || statusCode == 403 || statusCode == 404) {
+      return true;
+    }
+
+    final message = error.message.toLowerCase();
+    return message.contains('token') ||
+        message.contains('unauthorized') ||
+        message.contains('akses') ||
+        message.contains('sesi') ||
+        message.contains('login ulang') ||
+        message.contains('pengguna tidak ditemukan');
+  }
+
+  Future<void> _invalidateSession() async {
+    if (_isInvalidatingSession) {
+      return;
+    }
+    _isInvalidatingSession = true;
+
+    try {
+      await ref
+          .read(studentMonitoringSessionProvider)
+          .stop(markFinished: false);
+      _apiClient.setAuthToken(null);
+      await _secureStorage.clearAuthSession();
+      ref.invalidate(examListProvider);
+      ref.invalidate(subjectListProvider);
+      ref.invalidate(myResultsProvider);
+      ref.invalidate(adminResultsProvider);
+      state = const AuthState(status: AuthStatus.unauthenticated);
+      await ref.read(examSessionProvider.notifier).clearSession();
+    } finally {
+      _isInvalidatingSession = false;
+    }
   }
 
   Future<void> _restoreSession() async {
@@ -133,7 +218,13 @@ class AuthNotifier extends Notifier<AuthState> {
     try {
       final me = await _service.me();
       await _secureStorage.saveUser(me);
-      state = state.copyWith(user: me);
+      if (!_isSameUser(state.user, me)) {
+        state = state.copyWith(user: me);
+      }
+    } on ApiError catch (error) {
+      if (_shouldInvalidateSession(error)) {
+        await _invalidateSession();
+      }
     } catch (_) {
       // Keep current cached profile when refresh fails.
     }
@@ -260,13 +351,6 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
-    _apiClient.setAuthToken(null);
-    await _secureStorage.clearAuthSession();
-    await ref.read(examSessionProvider.notifier).clearSession();
-    ref.invalidate(examListProvider);
-    ref.invalidate(subjectListProvider);
-    ref.invalidate(myResultsProvider);
-    ref.invalidate(adminResultsProvider);
-    state = const AuthState(status: AuthStatus.unauthenticated);
+    await _invalidateSession();
   }
 }

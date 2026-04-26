@@ -291,6 +291,7 @@ class ExamSessionState {
     this.serverOffsetMs = 0,
     this.remainingSeconds = 0,
     this.serverDeadlineEpochMs,
+    this.monitoringPrecheckConfirmed = false,
     this.latestResult,
     this.warningMessage,
     this.errorMessage,
@@ -312,6 +313,7 @@ class ExamSessionState {
   final int serverOffsetMs;
   final int remainingSeconds;
   final int? serverDeadlineEpochMs;
+  final bool monitoringPrecheckConfirmed;
   final ResultResponse? latestResult;
   final String? warningMessage;
   final String? errorMessage;
@@ -390,6 +392,7 @@ class ExamSessionState {
     int? remainingSeconds,
     int? serverDeadlineEpochMs,
     bool clearServerDeadline = false,
+    bool? monitoringPrecheckConfirmed,
     ResultResponse? latestResult,
     bool clearLatestResult = false,
     String? warningMessage,
@@ -416,6 +419,8 @@ class ExamSessionState {
       serverDeadlineEpochMs: clearServerDeadline
           ? null
           : (serverDeadlineEpochMs ?? this.serverDeadlineEpochMs),
+      monitoringPrecheckConfirmed:
+          monitoringPrecheckConfirmed ?? this.monitoringPrecheckConfirmed,
       latestResult:
           clearLatestResult ? null : (latestResult ?? this.latestResult),
       warningMessage:
@@ -442,6 +447,7 @@ class ExamSessionState {
       'serverOffsetMs': serverOffsetMs,
       'remainingSeconds': remainingSeconds,
       'serverDeadlineEpochMs': serverDeadlineEpochMs,
+      'monitoringPrecheckConfirmed': monitoringPrecheckConfirmed,
       'latestResult': latestResult?.toJson(),
     };
   }
@@ -493,6 +499,8 @@ class ExamSessionState {
       serverOffsetMs: json['serverOffsetMs'] as int? ?? 0,
       remainingSeconds: json['remainingSeconds'] as int? ?? 0,
       serverDeadlineEpochMs: (json['serverDeadlineEpochMs'] as num?)?.toInt(),
+      monitoringPrecheckConfirmed:
+          json['monitoringPrecheckConfirmed'] as bool? ?? false,
       latestResult: (json['latestResult'] as Map<String, dynamic>?) == null
           ? null
           : ResultResponse.fromJson(
@@ -581,6 +589,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
         remainingSeconds: response.remainingSeconds ?? 0,
         serverDeadlineEpochMs: serverDeadlineEpochMs,
         clearServerDeadline: serverDeadlineEpochMs == null,
+        monitoringPrecheckConfirmed: false,
         submitState: SubmitState.idle,
         syncStatus: SyncStatus.synced,
         connectionState: ConnectionStatus.online,
@@ -648,6 +657,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
         remainingSeconds: detail.remainingSeconds ?? state.remainingSeconds,
         serverDeadlineEpochMs: recoveredServerDeadlineEpochMs,
         clearServerDeadline: recoveredServerDeadlineEpochMs == null,
+        monitoringPrecheckConfirmed: state.monitoringPrecheckConfirmed,
         connectionState: ConnectionStatus.online,
         clearErrorMessage: true,
       );
@@ -728,6 +738,15 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     final next =
         min(state.questions.length - 1, state.currentQuestionIndex + 1);
     state = state.copyWith(currentQuestionIndex: next);
+  }
+
+  Future<void> markMonitoringPrecheckConfirmed() async {
+    if (state.monitoringPrecheckConfirmed) {
+      return;
+    }
+
+    state = state.copyWith(monitoringPrecheckConfirmed: true);
+    await _persistSession();
   }
 
   void previousQuestion() {

@@ -74,6 +74,8 @@ class _AdminStudentAccountManagementScreenState
       _rollNumberController.clear();
       _selectedClassId = null;
       ref.invalidate(studentAccountsProvider);
+      ref.invalidate(classListProvider);
+      ref.invalidate(classDetailProvider);
       if (!mounted) {
         return;
       }
@@ -174,6 +176,8 @@ class _AdminStudentAccountManagementScreenState
     try {
       await service.deleteStudent(studentId);
       ref.invalidate(studentAccountsProvider);
+      ref.invalidate(classListProvider);
+      ref.invalidate(classDetailProvider);
       if (!mounted) {
         return;
       }

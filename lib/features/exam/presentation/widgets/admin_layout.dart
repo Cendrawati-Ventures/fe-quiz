@@ -13,6 +13,7 @@ enum AdminSection {
   subjects,
   questions,
   students,
+  proctoring,
   results
 }
 
@@ -286,6 +287,12 @@ class _AdminSidebar extends StatelessWidget {
         title: 'Akun Siswa',
         icon: Icons.group_rounded,
         path: '/admin/students',
+      ),
+      const _AdminMenuItem(
+        section: AdminSection.proctoring,
+        title: 'Pengawas',
+        icon: Icons.videocam_rounded,
+        path: '/admin/proctoring',
       ),
       const _AdminMenuItem(
         section: AdminSection.results,

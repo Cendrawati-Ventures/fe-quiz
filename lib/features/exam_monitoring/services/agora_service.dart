@@ -99,6 +99,13 @@ class AgoraService {
     required String channelName,
     required int uid,
     String? token,
+    ClientRoleType role = ClientRoleType.clientRoleBroadcaster,
+    bool publishCameraTrack = true,
+    bool publishMicrophoneTrack = true,
+    bool autoSubscribeAudio = true,
+    bool autoSubscribeVideo = true,
+    bool requestPermissions = true,
+    bool startPreview = true,
   }) async {
     final trimmedChannel = channelName.trim();
     if (trimmedChannel.isEmpty) {
@@ -132,22 +139,26 @@ class AgoraService {
         await leaveChannel();
       }
 
-      await _ensurePermissions();
+      if (requestPermissions) {
+        await _ensurePermissions();
+      }
 
       await engine.setClientRole(
-        role: ClientRoleType.clientRoleBroadcaster,
+        role: role,
       );
-      await engine.startPreview();
+      if (startPreview) {
+        await engine.startPreview();
+      }
       await engine.joinChannel(
         token: token?.trim().isNotEmpty == true ? token!.trim() : '',
         channelId: trimmedChannel,
         uid: uid,
-        options: const ChannelMediaOptions(
-          publishCameraTrack: true,
-          publishMicrophoneTrack: true,
-          autoSubscribeAudio: true,
-          autoSubscribeVideo: true,
-          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+        options: ChannelMediaOptions(
+          publishCameraTrack: publishCameraTrack,
+          publishMicrophoneTrack: publishMicrophoneTrack,
+          autoSubscribeAudio: autoSubscribeAudio,
+          autoSubscribeVideo: autoSubscribeVideo,
+          clientRoleType: role,
           channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
         ),
       );

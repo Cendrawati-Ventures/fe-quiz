@@ -1011,7 +1011,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
 
     final session = ref.read(examSessionProvider);
     if (session.hasActiveAttempt) {
-      context.go('/exam/session');
+      context.go('/exam/session/precheck');
       return;
     }
 

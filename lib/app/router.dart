@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/state/auth_provider.dart';
 import '../features/exam/presentation/admin_dashboard_screen.dart';
+import '../features/exam/presentation/admin_proctor_watch_screen.dart';
+import '../features/exam/presentation/admin_proctoring_standby_screen.dart';
 import '../features/exam/presentation/admin_class_management_screen.dart';
 import '../features/exam/presentation/admin_class_student_assignment_screen.dart';
 import '../features/exam/presentation/admin_class_subject_assignment_screen.dart';
@@ -16,9 +18,11 @@ import '../features/exam/presentation/admin_subject_management_screen.dart';
 import '../features/exam/presentation/exam_detail_start_screen.dart';
 import '../features/exam/presentation/exam_list_screen.dart';
 import '../features/exam/presentation/exam_screen.dart';
+import '../features/exam/model/exam_models.dart';
 import '../features/exam/presentation/result_screen.dart';
 import '../features/exam/state/exam_state.dart';
 import '../features/exam_monitoring/presentation/student_exam_gate_screen.dart';
+import '../features/exam_monitoring/presentation/student_exam_precheck_screen.dart';
 import 'route_guard.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -51,6 +55,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/exam/session',
         name: 'exam-session',
         builder: (context, state) => const ExamScreen(),
+      ),
+      GoRoute(
+        path: '/exam/session/precheck',
+        name: 'exam-session-precheck',
+        builder: (context, state) => const StudentExamPrecheckScreen(),
       ),
       GoRoute(
         path: '/exam/session/monitoring',
@@ -133,6 +142,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/admin/results',
         name: 'admin-results',
         builder: (context, state) => const AdminResultMonitoringScreen(),
+      ),
+      GoRoute(
+        path: '/admin/proctoring',
+        name: 'admin-proctoring',
+        builder: (context, state) => const AdminProctoringStandbyScreen(),
+      ),
+      GoRoute(
+        path: '/admin/proctoring/watch',
+        name: 'admin-proctoring-watch',
+        builder: (context, state) {
+          final payload = state.extra;
+          if (payload is! ActiveMonitoringAttempt) {
+            return const AdminProctoringStandbyScreen();
+          }
+          return AdminProctorWatchScreen(attempt: payload);
+        },
       ),
     ],
     redirect: (context, state) => authRedirect(ref, state),

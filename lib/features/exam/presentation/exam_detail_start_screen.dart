@@ -144,7 +144,7 @@ class _ExamDetailStartScreenState extends ConsumerState<ExamDetailStartScreen> {
 
                 final latestSession = ref.read(examSessionProvider);
                 if (latestSession.hasActiveAttempt) {
-                  context.go('/exam/session');
+                  context.go('/exam/session/precheck');
                   return;
                 }
 

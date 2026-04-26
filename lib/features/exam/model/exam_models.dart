@@ -559,6 +559,98 @@ class AttemptMonitoringConfig {
   }
 }
 
+class ActiveMonitoringStudent {
+  const ActiveMonitoringStudent({
+    required this.id,
+    required this.username,
+    required this.displayName,
+    required this.fullName,
+    required this.classId,
+    required this.className,
+    required this.rollNumber,
+  });
+
+  final String id;
+  final String username;
+  final String? displayName;
+  final String? fullName;
+  final String? classId;
+  final String? className;
+  final String? rollNumber;
+
+  factory ActiveMonitoringStudent.fromJson(Map<String, dynamic> json) {
+    return ActiveMonitoringStudent(
+      id: json['id'] as String? ?? '',
+      username: json['username'] as String? ?? '',
+      displayName: json['displayName'] as String?,
+      fullName: json['fullName'] as String?,
+      classId: json['classId'] as String?,
+      className: json['className'] as String?,
+      rollNumber: json['rollNumber'] as String?,
+    );
+  }
+
+  String get labelName {
+    final fullNameValue = fullName?.trim();
+    if (fullNameValue != null && fullNameValue.isNotEmpty) {
+      return fullNameValue;
+    }
+    final displayNameValue = displayName?.trim();
+    if (displayNameValue != null && displayNameValue.isNotEmpty) {
+      return displayNameValue;
+    }
+    return username.trim().isNotEmpty ? username.trim() : 'Siswa';
+  }
+}
+
+class ActiveMonitoringAttempt {
+  const ActiveMonitoringAttempt({
+    required this.attemptId,
+    required this.startedAt,
+    required this.remainingSeconds,
+    required this.student,
+    required this.examId,
+    required this.examTitle,
+    required this.subjectId,
+    required this.subjectName,
+    required this.monitoring,
+  });
+
+  final String attemptId;
+  final DateTime startedAt;
+  final int remainingSeconds;
+  final ActiveMonitoringStudent student;
+  final String examId;
+  final String examTitle;
+  final String subjectId;
+  final String subjectName;
+  final AttemptMonitoringConfig monitoring;
+
+  factory ActiveMonitoringAttempt.fromJson(Map<String, dynamic> json) {
+    final studentRaw =
+        json['student'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final examRaw =
+        json['exam'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final subjectRaw =
+        json['subject'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final monitoringRaw = json['monitoring'] as Map<String, dynamic>? ??
+        const <String, dynamic>{};
+
+    return ActiveMonitoringAttempt(
+      attemptId: json['attemptId'] as String? ?? '',
+      startedAt: DateTime.tryParse(json['startedAt'] as String? ?? '') ??
+          DateTime.now().toUtc(),
+      remainingSeconds: (json['remainingSeconds'] as num?)?.toInt() ?? 0,
+      student: ActiveMonitoringStudent.fromJson(studentRaw),
+      examId: examRaw['id'] as String? ?? '',
+      examTitle: examRaw['title'] as String? ?? '',
+      subjectId: subjectRaw['id'] as String? ?? '',
+      subjectName: subjectRaw['name'] as String? ?? '',
+      monitoring: AttemptMonitoringConfig.fromJson(monitoringRaw),
+    );
+  }
+}
+
 class StartAttemptResponse {
   const StartAttemptResponse({
     required this.attempt,

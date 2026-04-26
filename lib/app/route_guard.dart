@@ -10,8 +10,8 @@ String? authRedirect(Ref ref, GoRouterState state) {
   final path = state.matchedLocation;
   final isLoginRoute = path == '/login';
   final isAdminRoute = path.startsWith('/admin');
-  final isExamSessionRoute =
-      path == '/exam/session' || path == '/exam/session/monitoring';
+  final isExamSessionRoute = path.startsWith('/exam/session');
+  final isPrecheckRoute = path == '/exam/session/precheck';
 
   if (authState.status == AuthStatus.checking) {
     return null;
@@ -42,8 +42,13 @@ String? authRedirect(Ref ref, GoRouterState state) {
       return '/result';
     }
 
-    if (sessionState.hasActiveAttempt && !isExamSessionRoute) {
-      return '/exam/session';
+    if (sessionState.hasActiveAttempt) {
+      if (!sessionState.monitoringPrecheckConfirmed && !isPrecheckRoute) {
+        return '/exam/session/precheck';
+      }
+      if (sessionState.monitoringPrecheckConfirmed && !isExamSessionRoute) {
+        return '/exam/session';
+      }
     }
 
     if (isLoginRoute || isAdminRoute) {
