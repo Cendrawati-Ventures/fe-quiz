@@ -207,7 +207,7 @@ class _AdminResultMonitoringScreenState
     return AppCard(
       title: "Filter Hasil",
       subtitle:
-          "Menampilkan ${filteredResults.length} dari ${allResults.length} data hasil.",
+          "Menampilkan ${filteredResults.length} dari ${allResults.length} data hasil (riwayat semua percobaan).",
       child: Wrap(
         spacing: AppSpacing.sm,
         runSpacing: AppSpacing.sm,
@@ -325,6 +325,189 @@ class _AdminResultMonitoringScreenState
     return "Indikator terdeteksi: ${parts.join(", ")}.";
   }
 
+  List<_ResultHistoryGroup> _groupHistoryResults(List<ResultResponse> results) {
+    final groups = <String, List<ResultResponse>>{};
+
+    for (final item in results) {
+      final key = _historyGroupKey(item);
+      groups.putIfAbsent(key, () => <ResultResponse>[]).add(item);
+    }
+
+    final mapped = groups.values.map((items) {
+      final attempts = List<ResultResponse>.from(items)
+        ..sort(_compareResultHistoryDesc);
+      final latest = attempts.first;
+      final className = latest.className?.trim().isNotEmpty == true
+          ? latest.className!.trim()
+          : "-";
+
+      return _ResultHistoryGroup(
+        examTitle: latest.examTitle?.trim().isNotEmpty == true
+            ? latest.examTitle!.trim()
+            : "Ujian",
+        subjectName: latest.subjectName?.trim().isNotEmpty == true
+            ? latest.subjectName!.trim()
+            : "-",
+        username: latest.username?.trim().isNotEmpty == true
+            ? latest.username!.trim()
+            : "-",
+        className: className,
+        attempts: attempts,
+      );
+    }).toList();
+
+    mapped.sort(
+      (left, right) =>
+          _compareResultHistoryDesc(left.attempts.first, right.attempts.first),
+    );
+
+    return mapped;
+  }
+
+  String _historyGroupKey(ResultResponse result) {
+    final username = (result.username ?? '').trim().toLowerCase();
+    final examIdentity =
+        (result.examId ?? result.examTitle ?? '').trim().toLowerCase();
+    final subjectIdentity =
+        (result.subjectId ?? result.subjectName ?? '').trim().toLowerCase();
+
+    final safeUsername =
+        username.isNotEmpty ? username : result.attemptId.toLowerCase();
+    return '$safeUsername|$examIdentity|$subjectIdentity';
+  }
+
+  int _compareResultHistoryDesc(ResultResponse left, ResultResponse right) {
+    final byAttemptNo = (right.attemptNo ?? 0).compareTo(left.attemptNo ?? 0);
+    if (byAttemptNo != 0) {
+      return byAttemptNo;
+    }
+
+    final leftTime = _resolveResultTimestamp(left);
+    final rightTime = _resolveResultTimestamp(right);
+    final byTimestamp = rightTime.compareTo(leftTime);
+    if (byTimestamp != 0) {
+      return byTimestamp;
+    }
+
+    return right.id.compareTo(left.id);
+  }
+
+  DateTime _resolveResultTimestamp(ResultResponse result) {
+    return result.endTime ??
+        result.startTime ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+
+  String _formatDateTime(DateTime? value) {
+    if (value == null) {
+      return '-';
+    }
+    final local = value.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final year = local.year.toString();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    final second = local.second.toString().padLeft(2, '0');
+    return '$day/$month/$year $hour:$minute:$second';
+  }
+
+  String _formatDuration(int totalSeconds) {
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+    final parts = <String>[];
+
+    if (hours > 0) {
+      parts.add('${hours}j');
+    }
+    if (minutes > 0 || hours > 0) {
+      parts.add('${minutes}m');
+    }
+    parts.add('${seconds}dtk');
+    return parts.join(' ');
+  }
+
+  Widget _buildAttemptHistoryItem(ResultResponse result) {
+    final deleting = _deletingResultId == result.id;
+    final startedAt = _formatDateTime(result.startTime);
+    final endedAt = result.endTime == null
+        ? 'Belum selesai'
+        : _formatDateTime(result.endTime);
+    final attemptLabel = result.attemptNo == null
+        ? 'Percobaan -'
+        : 'Percobaan ke-${result.attemptNo}';
+    final subtitle = StringBuffer()
+      ..write('Mulai: $startedAt\n')
+      ..write('Selesai: $endedAt\n')
+      ..write('Durasi: ${_formatDuration(result.duration)}\n')
+      ..write('Nilai: ${result.score} | ')
+      ..write('Benar: ${result.correct} | ')
+      ..write('Salah: ${result.wrong}\n')
+      ..write('Risiko: ${riskLevelLabel(result.riskLevel)}\n')
+      ..write('Info Pengawasan: ${_proctoringSummary(result)}');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.55),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            attemptLabel,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(subtitle.toString()),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: <Widget>[
+              OutlinedButton.icon(
+                onPressed: () => _openAnswerReview(result),
+                icon: const Icon(Icons.rule_folder_outlined),
+                label: const Text("Review Jawaban"),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _openAudioChunks(result),
+                icon: const Icon(Icons.graphic_eq_rounded),
+                label: const Text('Dengar Rekaman'),
+              ),
+              FilledButton.icon(
+                onPressed: deleting ? null : () => _deleteResult(result),
+                icon: deleting
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.delete_outline_rounded),
+                label: Text(deleting ? 'Menghapus...' : 'Hapus Hasil'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final resultsAsync = ref.watch(adminResultsProvider);
@@ -344,7 +527,8 @@ class _AdminResultMonitoringScreenState
         );
     return AdminLayout(
       title: 'Pantau Hasil Ujian',
-      subtitle: 'Pantau nilai dan tingkat risiko peserta ujian.',
+      subtitle:
+          'Pantau nilai, waktu mulai/selesai, dan riwayat semua percobaan peserta.',
       activeSection: AdminSection.results,
       child: resultsAsync.when(
         data: (results) {
@@ -368,6 +552,7 @@ class _AdminResultMonitoringScreenState
             knownExamTitles: knownExamTitles,
           );
           final filteredResults = _applyFilters(results);
+          final groupedResults = _groupHistoryResults(filteredResults);
 
           return ListView(
             children: <Widget>[
@@ -384,54 +569,21 @@ class _AdminResultMonitoringScreenState
                   subtitle:
                       "Tidak ada hasil ujian yang cocok dengan filter kelas dan ujian saat ini.",
                 ),
-              ...filteredResults.map((result) {
-                final deleting = _deletingResultId == result.id;
-                final className = result.className?.trim().isNotEmpty == true
-                    ? result.className!.trim()
-                    : "-";
+              ...groupedResults.map((group) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                   child: AppCard(
-                    title: result.examTitle ?? 'Ujian',
+                    title: group.examTitle,
                     subtitle:
-                        'Peserta: ${result.username ?? '-'}\nKelas: $className\nNilai: ${result.score}\nRisiko: ${riskLevelLabel(result.riskLevel)}\nInfo Pengawasan: ${_proctoringSummary(result)}',
-                    status: result.subjectName,
-                    child: Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
+                        'Peserta: ${group.username}\nKelas: ${group.className}\nMata Pelajaran: ${group.subjectName}\nTotal Percobaan: ${group.attempts.length}',
+                    status: 'Riwayat Percobaan',
+                    child: Column(
                       children: <Widget>[
-                        OutlinedButton.icon(
-                          onPressed: () => _openAnswerReview(result),
-                          icon: const Icon(Icons.rule_folder_outlined),
-                          label: const Text("Review Jawaban"),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => _openAudioChunks(result),
-                          icon: const Icon(Icons.graphic_eq_rounded),
-                          label: const Text('Dengar Rekaman'),
-                        ),
-                        FilledButton.icon(
-                          onPressed:
-                              deleting ? null : () => _deleteResult(result),
-                          icon: deleting
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.delete_outline_rounded),
-                          label:
-                              Text(deleting ? 'Menghapus...' : 'Hapus Hasil'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor:
-                                Theme.of(context).colorScheme.error,
-                            foregroundColor:
-                                Theme.of(context).colorScheme.onError,
-                          ),
-                        ),
+                        for (var i = 0; i < group.attempts.length; i++) ...[
+                          _buildAttemptHistoryItem(group.attempts[i]),
+                          if (i < group.attempts.length - 1)
+                            const SizedBox(height: AppSpacing.sm),
+                        ],
                       ],
                     ),
                   ),
@@ -456,6 +608,22 @@ class _ExamFilterOption {
   });
 
   final String examTitle;
+}
+
+class _ResultHistoryGroup {
+  const _ResultHistoryGroup({
+    required this.examTitle,
+    required this.subjectName,
+    required this.username,
+    required this.className,
+    required this.attempts,
+  });
+
+  final String examTitle;
+  final String subjectName;
+  final String username;
+  final String className;
+  final List<ResultResponse> attempts;
 }
 
 enum _AnswerStatus {

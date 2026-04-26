@@ -852,6 +852,9 @@ class SubmitResponse {
       subjectId: null,
       classId: null,
       className: null,
+      attemptNo: null,
+      startTime: null,
+      endTime: null,
       score: score,
       correct: correct,
       wrong: wrong,
@@ -873,6 +876,9 @@ class ResultResponse {
     required this.subjectId,
     required this.classId,
     required this.className,
+    required this.attemptNo,
+    required this.startTime,
+    required this.endTime,
     required this.score,
     required this.correct,
     required this.wrong,
@@ -891,6 +897,9 @@ class ResultResponse {
   final String? subjectId;
   final String? classId;
   final String? className;
+  final int? attemptNo;
+  final DateTime? startTime;
+  final DateTime? endTime;
   final num score;
   final int correct;
   final int wrong;
@@ -910,6 +919,13 @@ class ResultResponse {
       subjectId: json['subjectId'] as String?,
       classId: json['classId'] as String?,
       className: json['className'] as String?,
+      attemptNo: (json['attemptNo'] as num?)?.toInt(),
+      startTime: (json['startTime'] as String?) == null
+          ? null
+          : DateTime.parse(json['startTime'] as String),
+      endTime: (json['endTime'] as String?) == null
+          ? null
+          : DateTime.parse(json['endTime'] as String),
       score: json['score'] as num? ?? 0,
       correct: json['correct'] as int? ?? 0,
       wrong: json['wrong'] as int? ?? 0,
@@ -936,6 +952,9 @@ class ResultResponse {
       'subjectId': subjectId,
       'classId': classId,
       'className': className,
+      'attemptNo': attemptNo,
+      'startTime': startTime?.toIso8601String(),
+      'endTime': endTime?.toIso8601String(),
       'score': score,
       'correct': correct,
       'wrong': wrong,
