@@ -505,6 +505,7 @@ class AttemptMonitoringConfig {
     required this.agoraAppId,
     required this.agoraChannel,
     required this.agoraUid,
+    required this.agoraPublisherUid,
     required this.agoraToken,
     required this.agoraTokenExpiresAt,
     required this.firebasePath,
@@ -518,6 +519,7 @@ class AttemptMonitoringConfig {
   final String? agoraAppId;
   final String? agoraChannel;
   final int? agoraUid;
+  final int? agoraPublisherUid;
   final String? agoraToken;
   final DateTime? agoraTokenExpiresAt;
   final String? firebasePath;
@@ -532,6 +534,7 @@ class AttemptMonitoringConfig {
       agoraAppId: json['agoraAppId'] as String?,
       agoraChannel: json['agoraChannel'] as String?,
       agoraUid: (json['agoraUid'] as num?)?.toInt(),
+      agoraPublisherUid: (json['agoraPublisherUid'] as num?)?.toInt(),
       agoraToken: json['agoraToken'] as String?,
       agoraTokenExpiresAt: (json['agoraTokenExpiresAt'] as String?) == null
           ? null
@@ -550,6 +553,7 @@ class AttemptMonitoringConfig {
       'agoraAppId': agoraAppId,
       'agoraChannel': agoraChannel,
       'agoraUid': agoraUid,
+      'agoraPublisherUid': agoraPublisherUid,
       'agoraToken': agoraToken,
       'agoraTokenExpiresAt': agoraTokenExpiresAt?.toIso8601String(),
       'firebasePath': firebasePath,

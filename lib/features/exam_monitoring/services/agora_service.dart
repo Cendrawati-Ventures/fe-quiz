@@ -16,11 +16,7 @@ enum AgoraServiceConnectionState {
 }
 
 class AgoraService {
-  AgoraService._internal();
-
-  static final AgoraService _instance = AgoraService._internal();
-
-  factory AgoraService() => _instance;
+  AgoraService();
 
   final ValueNotifier<AgoraServiceConnectionState> connectionState =
       ValueNotifier<AgoraServiceConnectionState>(

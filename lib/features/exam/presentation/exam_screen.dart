@@ -172,6 +172,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         (isGroupQuestion && groupSubQuestions.isEmpty);
     final progress =
         totalQuestions == 0 ? 0.0 : (currentIndex + 1) / totalQuestions;
+    final isLastQuestion = currentIndex == totalQuestions - 1;
+    final unansweredCount = state.unansweredCount;
+    final canSubmitAllAnswers = unansweredCount == 0;
 
     return PopScope(
       canPop: false,
@@ -283,14 +286,29 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
               children: <Widget>[
                 Expanded(
                   child: BottomActionBarButton(
-                    label: currentIndex == totalQuestions - 1
-                        ? 'Kumpulkan'
+                    label: isLastQuestion
+                        ? (canSubmitAllAnswers
+                            ? 'Kumpulkan'
+                            : 'Jawab $unansweredCount Lagi')
                         : 'Berikutnya',
-                    onPressed: currentIndex == totalQuestions - 1
+                    onPressed: isLastQuestion
                         ? () async {
+                            if (!canSubmitAllAnswers) {
+                              if (!context.mounted) {
+                                return;
+                              }
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Masih ada $unansweredCount soal yang belum dijawab.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
                             final shouldSubmit = await _confirmSubmit(
                               context,
-                              state.unansweredCount,
+                              unansweredCount,
                             );
                             if (!shouldSubmit) {
                               return;
@@ -299,7 +317,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
                           }
                         : notifier.nextQuestion,
                     loading: state.submitState == SubmitState.submitting,
-                    disabled: state.submitState == SubmitState.submitting,
+                    disabled: state.submitState == SubmitState.submitting ||
+                        (isLastQuestion && !canSubmitAllAnswers),
                   ),
                 ),
               ],

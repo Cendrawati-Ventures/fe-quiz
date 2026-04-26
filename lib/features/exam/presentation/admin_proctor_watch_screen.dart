@@ -136,6 +136,41 @@ class _AdminProctorWatchScreenState extends State<AdminProctorWatchScreen> {
           );
         }
 
+        final expectedUid = widget.attempt.monitoring.agoraPublisherUid;
+        if (expectedUid != null && !remoteUids.contains(expectedUid)) {
+          return Container(
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Text(
+                'Stream siswa ini belum masuk.\nStream aktif lain terdeteksi: ${remoteUids.length}.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
+
+        if (expectedUid != null) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: AgoraVideoView(
+              controller: VideoViewController.remote(
+                rtcEngine: engine,
+                canvas: VideoCanvas(uid: expectedUid),
+                connection: RtcConnection(
+                  channelId: _controller.channelName ?? '',
+                ),
+              ),
+            ),
+          );
+        }
+
         return GridView.builder(
           itemCount: remoteUids.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

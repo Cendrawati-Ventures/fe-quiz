@@ -771,6 +771,16 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
       return;
     }
 
+    if (state.unansweredCount > 0) {
+      state = state.copyWith(
+        submitState: SubmitState.failed,
+        isLoading: false,
+        errorMessage:
+            'Semua soal wajib dijawab sebelum dikumpulkan. Masih ada ${state.unansweredCount} soal belum dijawab.',
+      );
+      return;
+    }
+
     state = state.copyWith(
       submitState: SubmitState.submitting,
       isLoading: true,
