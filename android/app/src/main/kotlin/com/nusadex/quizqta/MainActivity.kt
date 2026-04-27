@@ -1,4 +1,4 @@
-package com.example.online_exam_system
+package com.nusadex.quizqta
 
 import android.Manifest
 import android.graphics.RenderEffect

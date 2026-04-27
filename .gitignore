@@ -23,6 +23,7 @@ migrate_working_dir/
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+.gradle-cache/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
@@ -43,6 +44,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/key.properties
+/android/*.jks
+/android/*.keystore
 
 # Env
 .env
