@@ -32,7 +32,7 @@ class _AdminProctoringStandbyScreenState
   static const String _allClassValue = '__all__';
 
   Timer? _refreshTimer;
-  bool _standbyConfirmed = false;
+  bool _isTogglingStandby = false;
   String _selectedClassId = _allClassValue;
 
   @override
@@ -42,65 +42,189 @@ class _AdminProctoringStandbyScreenState
     super.dispose();
   }
 
-  void _activateStandby() {
-    if (_standbyConfirmed) {
+  Future<void> _activateStandby() async {
+    if (_isTogglingStandby) {
       return;
     }
     setState(() {
-      _standbyConfirmed = true;
+      _isTogglingStandby = true;
     });
-    ref.invalidate(activeMonitoringAttemptsProvider);
-    _refreshTimer?.cancel();
+    try {
+      await ref.read(examServiceProvider).activateProctoringStandby();
+      ref.invalidate(proctoringStandbyStatusProvider);
+      ref.invalidate(activeMonitoringAttemptsProvider);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Standby pengawas aktif. Siswa bisa mulai ujian.'),
+        ),
+      );
+    } on ApiError catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aktivasi standby belum berhasil. Coba lagi.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isTogglingStandby = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _deactivateStandby() async {
+    if (_isTogglingStandby) {
+      return;
+    }
+    setState(() {
+      _isTogglingStandby = true;
+    });
+    try {
+      await ref.read(examServiceProvider).deactivateProctoringStandby();
+      ref.invalidate(proctoringStandbyStatusProvider);
+      ref.invalidate(activeMonitoringAttemptsProvider);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Standby pengawas dinonaktifkan.'),
+        ),
+      );
+    } on ApiError catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Menonaktifkan standby belum berhasil. Coba lagi.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isTogglingStandby = false;
+        });
+      }
+    }
+  }
+
+  void _syncRefreshTimer({required bool standbyActive}) {
+    if (!standbyActive) {
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+      return;
+    }
+
+    if (_refreshTimer != null) {
+      return;
+    }
+
     _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted) {
         return;
       }
+      ref.invalidate(proctoringStandbyStatusProvider);
       ref.invalidate(activeMonitoringAttemptsProvider);
     });
   }
 
   Future<void> _refreshNow() async {
+    ref.invalidate(proctoringStandbyStatusProvider);
     ref.invalidate(activeMonitoringAttemptsProvider);
-    await ref.read(activeMonitoringAttemptsProvider.future);
+    try {
+      await ref.read(activeMonitoringAttemptsProvider.future);
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    final attemptsAsync = ref.watch(activeMonitoringAttemptsProvider);
+    final standbyAsync = ref.watch(proctoringStandbyStatusProvider);
+    final standbyActive = standbyAsync.maybeWhen(
+      data: (value) => value.isActive,
+      orElse: () => false,
+    );
+    final attemptsAsync = standbyActive
+        ? ref.watch(activeMonitoringAttemptsProvider)
+        : const AsyncValue<List<ActiveMonitoringAttempt>>.data(
+            <ActiveMonitoringAttempt>[],
+          );
+    _syncRefreshTimer(standbyActive: standbyActive);
 
     return AdminLayout(
       title: 'Standby Pengawas',
       subtitle: 'Pantau kamera siswa aktif per kelas secara langsung.',
       activeSection: AdminSection.proctoring,
-      child: !_standbyConfirmed
-          ? _buildStandbyConfirmation()
-          : RefreshIndicator(
-              onRefresh: _refreshNow,
-              child: ListView(
-                children: <Widget>[
-                  _standbyInfoCard(context),
-                  const SizedBox(height: AppSpacing.md),
-                  attemptsAsync.when(
-                    data: (items) => _buildMonitoringWall(context, items),
-                    loading: () => const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(AppSpacing.lg),
-                        child: CircularProgressIndicator(),
-                      ),
-                    ),
-                    error: (error, _) => AppCard(
-                      title: 'Data siswa aktif gagal dimuat',
-                      subtitle:
-                          error is ApiError ? error.message : error.toString(),
-                      child: FilledButton(
-                        onPressed: _refreshNow,
-                        child: const Text('Muat Ulang'),
-                      ),
+      child: standbyAsync.when(
+        data: (standby) {
+          if (!standby.isActive) {
+            return _buildStandbyConfirmation();
+          }
+
+          return RefreshIndicator(
+            onRefresh: _refreshNow,
+            child: ListView(
+              children: <Widget>[
+                _standbyInfoCard(context, standby),
+                const SizedBox(height: AppSpacing.md),
+                attemptsAsync.when(
+                  data: (items) => _buildMonitoringWall(context, items),
+                  loading: () => const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(AppSpacing.lg),
+                      child: CircularProgressIndicator(),
                     ),
                   ),
-                ],
-              ),
+                  error: (error, _) => AppCard(
+                    title: 'Data siswa aktif gagal dimuat',
+                    subtitle:
+                        error is ApiError ? error.message : error.toString(),
+                    child: FilledButton(
+                      onPressed: _refreshNow,
+                      child: const Text('Muat Ulang'),
+                    ),
+                  ),
+                ),
+              ],
             ),
+          );
+        },
+        loading: () => const Center(
+          child: Padding(
+            padding: EdgeInsets.all(AppSpacing.lg),
+            child: CircularProgressIndicator(),
+          ),
+        ),
+        error: (error, _) => AppCard(
+          title: 'Status standby gagal dimuat',
+          subtitle: error is ApiError ? error.message : error.toString(),
+          child: FilledButton(
+            onPressed: _refreshNow,
+            child: const Text('Muat Ulang'),
+          ),
+        ),
+      ),
     );
   }
 
@@ -271,13 +395,17 @@ class _AdminProctoringStandbyScreenState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const Text(
-                'Setelah standby aktif, semua tampilan siswa yang sedang ujian akan ditampilkan langsung per kelas.',
+                'Selama standby belum aktif, siswa akan ditahan dan belum bisa mulai ujian.',
               ),
               const SizedBox(height: AppSpacing.md),
               FilledButton.icon(
-                onPressed: _activateStandby,
+                onPressed: _isTogglingStandby ? null : _activateStandby,
                 icon: const Icon(Icons.verified_user_rounded),
-                label: const Text('Saya Standby Mengawasi'),
+                label: Text(
+                  _isTogglingStandby
+                      ? 'Memproses...'
+                      : 'Saya Standby Mengawasi',
+                ),
               ),
             ],
           ),
@@ -286,7 +414,20 @@ class _AdminProctoringStandbyScreenState
     );
   }
 
-  Widget _standbyInfoCard(BuildContext context) {
+  Widget _standbyInfoCard(
+    BuildContext context,
+    ProctoringStandbyStatus standbyStatus,
+  ) {
+    final confirmedAt = standbyStatus.confirmedAt?.toLocal();
+    final confirmedAtLabel = confirmedAt == null
+        ? '-'
+        : '${confirmedAt.day.toString().padLeft(2, '0')}/'
+            '${confirmedAt.month.toString().padLeft(2, '0')}/'
+            '${confirmedAt.year} '
+            '${confirmedAt.hour.toString().padLeft(2, '0')}:'
+            '${confirmedAt.minute.toString().padLeft(2, '0')}:'
+            '${confirmedAt.second.toString().padLeft(2, '0')}';
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
@@ -303,14 +444,19 @@ class _AdminProctoringStandbyScreenState
             color: Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(width: AppSpacing.xs),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Mode standby aktif. Pantauan akan diperbarui otomatis setiap 5 detik.',
+              'Mode standby aktif (konfirmasi: $confirmedAtLabel). Pantauan akan diperbarui otomatis setiap 5 detik.',
             ),
           ),
           TextButton(
             onPressed: _refreshNow,
             child: const Text('Refresh'),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          OutlinedButton(
+            onPressed: _isTogglingStandby ? null : _deactivateStandby,
+            child: Text(_isTogglingStandby ? 'Memproses...' : 'Nonaktifkan'),
           ),
         ],
       ),

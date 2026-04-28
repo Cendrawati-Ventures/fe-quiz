@@ -563,6 +563,33 @@ class AttemptMonitoringConfig {
   }
 }
 
+class ProctoringStandbyStatus {
+  const ProctoringStandbyStatus({
+    required this.isActive,
+    required this.confirmedByUserId,
+    required this.confirmedAt,
+    required this.updatedAt,
+  });
+
+  final bool isActive;
+  final String? confirmedByUserId;
+  final DateTime? confirmedAt;
+  final DateTime? updatedAt;
+
+  factory ProctoringStandbyStatus.fromJson(Map<String, dynamic> json) {
+    return ProctoringStandbyStatus(
+      isActive: json['isActive'] as bool? ?? false,
+      confirmedByUserId: json['confirmedByUserId'] as String?,
+      confirmedAt: (json['confirmedAt'] as String?) == null
+          ? null
+          : DateTime.parse(json['confirmedAt'] as String),
+      updatedAt: (json['updatedAt'] as String?) == null
+          ? null
+          : DateTime.parse(json['updatedAt'] as String),
+    );
+  }
+}
+
 class ActiveMonitoringStudent {
   const ActiveMonitoringStudent({
     required this.id,

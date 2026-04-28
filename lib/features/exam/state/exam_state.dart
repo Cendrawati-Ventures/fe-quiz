@@ -31,6 +31,12 @@ final subjectListProvider = FutureProvider<List<ApiSubject>>((ref) async {
   return service.listSubjects();
 });
 
+final proctoringStandbyStatusProvider =
+    FutureProvider<ProctoringStandbyStatus>((ref) async {
+  final service = ref.watch(examServiceProvider);
+  return service.getProctoringStandbyStatus();
+});
+
 final myResultsProvider = FutureProvider<List<ResultResponse>>((ref) async {
   final service = ref.watch(examServiceProvider);
   return service.getMyResults();
@@ -555,6 +561,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
 
   Future<void> startAttempt({
     required ApiSubject subject,
+    String? classId,
   }) async {
     state = state.copyWith(
       isLoading: true,
@@ -568,6 +575,7 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     try {
       final response = await _service.startAttempt(
         subjectId: subject.id,
+        classId: classId,
       );
       final serverOffsetMs = _serverOffsetFrom(response.serverNow);
       final serverDeadlineEpochMs = _resolveServerDeadlineEpochMs(

@@ -32,6 +32,7 @@ class ExamScreen extends ConsumerStatefulWidget {
 }
 
 class _ExamScreenState extends ConsumerState<ExamScreen> {
+  static const bool _backgroundMusicEnabled = false;
   static const String _backgroundMusicAsset = 'audio/default-music.wav';
   static const double _backgroundMusicVolume = 0.28;
   static const Duration _audioChunkDuration = Duration(seconds: 30);
@@ -614,6 +615,13 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
           bitRate: 64000,
           sampleRate: 44100,
           numChannels: 1,
+          echoCancel: true,
+          noiseSuppress: true,
+          androidConfig: AndroidRecordConfig(
+            audioSource: AndroidAudioSource.voiceRecognition,
+            audioManagerMode: AudioManagerMode.modeInCommunication,
+            muteAudio: true,
+          ),
         ),
         path: filePath,
       );
@@ -760,6 +768,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   }
 
   void _syncBackgroundMusic(ExamSessionState state) {
+    if (!_backgroundMusicEnabled) {
+      _stopBackgroundMusic();
+      return;
+    }
+
     final attempt = state.attempt;
     if (!state.hasActiveAttempt || attempt == null) {
       _stopBackgroundMusic();

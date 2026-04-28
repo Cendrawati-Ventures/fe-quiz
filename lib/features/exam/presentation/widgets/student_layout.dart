@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/student_route_history_state.dart';
 import '../../../../app/theme/colors.dart';
 import '../../../../app/theme/spacing.dart';
+import '../../model/classroom_models.dart';
+import '../../service/classroom_service.dart';
+import '../../state/student_class_scope_state.dart';
 import '../../../auth/state/auth_provider.dart';
 
 enum StudentSection { exams, results }
@@ -30,13 +35,39 @@ class StudentLayout extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final width = MediaQuery.sizeOf(context).width;
     final isDesktop = width >= 980;
+    final currentRoutePath = GoRouterState.of(context).matchedLocation;
 
     final user = ref.watch(authProvider.select((state) => state.user));
     final displayName = user?.effectiveDisplayName ?? 'Siswa';
     final username = user?.username ?? 'siswa';
-    final className = user?.className?.trim().isNotEmpty == true
+    final fallbackClassName = user?.className?.trim().isNotEmpty == true
         ? user!.className!.trim()
         : 'Kelas belum ditetapkan';
+    final myClassOptionsAsync = ref.watch(myClassOptionsProvider);
+    final selectedClassId = ref.watch(effectiveStudentClassIdProvider);
+    final classOptions = myClassOptionsAsync.maybeWhen(
+      data: (items) => items,
+      orElse: () => const <StudentClassOption>[],
+    );
+    String? selectedClassName;
+    for (final item in classOptions) {
+      if (item.id != selectedClassId) {
+        continue;
+      }
+      final trimmedName = item.name.trim();
+      if (trimmedName.isEmpty) {
+        continue;
+      }
+      selectedClassName = trimmedName;
+      break;
+    }
+    final className = selectedClassName ?? fallbackClassName;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(studentRouteHistoryProvider.notifier)
+          .recordVisit(currentRoutePath);
+    });
 
     Future<void> logout() async {
       final confirmed = await _showLogoutConfirmationDialog(context);
@@ -44,6 +75,40 @@ class StudentLayout extends ConsumerWidget {
         return;
       }
       await ref.read(authProvider.notifier).logout();
+    }
+
+    Future<void> selectClass(String? classId) async {
+      await ref
+          .read(studentSelectedClassIdProvider.notifier)
+          .setSelectedClassId(classId);
+      if (context.mounted && currentRoutePath != '/exam') {
+        context.go('/exam');
+      }
+    }
+
+    Future<void> handleBackPressed() async {
+      final previousRoute = await ref
+          .read(studentRouteHistoryProvider.notifier)
+          .popPreviousRoute(currentRoute: currentRoutePath);
+
+      if (previousRoute != null &&
+          previousRoute.trim().isNotEmpty &&
+          previousRoute != currentRoutePath) {
+        if (!context.mounted) {
+          return;
+        }
+        context.go(previousRoute);
+        return;
+      }
+
+      if (!context.mounted) {
+        return;
+      }
+      final shouldExit = await _showExitAppConfirmationDialog(context);
+      if (!context.mounted || !shouldExit) {
+        return;
+      }
+      await SystemNavigator.pop();
     }
 
     void navigateTo(String path) {
@@ -55,68 +120,91 @@ class StudentLayout extends ConsumerWidget {
       }
     }
 
-    if (!isDesktop) {
-      return Scaffold(
-        backgroundColor: AppColors.bgBase,
-        appBar: AppBar(
-          title: Text(title),
-          actions: actions,
-        ),
-        drawer: Drawer(
-          child: SafeArea(
-            child: _StudentSidebar(
-              activeSection: activeSection,
-              displayName: displayName,
-              username: username,
-              className: className,
-              onNavigate: navigateTo,
-              onLogout: logout,
+    final scaffold = !isDesktop
+        ? Scaffold(
+            backgroundColor: AppColors.bgBase,
+            appBar: AppBar(
+              title: Text(title),
+              actions: actions,
             ),
-          ),
-        ),
-        body: Padding(
-          padding: contentPadding,
-          child: child,
-        ),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: AppColors.bgBase,
-      body: SafeArea(
-        child: Row(
-          children: <Widget>[
-            SizedBox(
-              width: 286,
-              child: _StudentSidebar(
-                activeSection: activeSection,
-                displayName: displayName,
-                username: username,
-                className: className,
-                onNavigate: navigateTo,
-                onLogout: logout,
+            drawer: Drawer(
+              child: SafeArea(
+                child: _StudentSidebar(
+                  activeSection: activeSection,
+                  displayName: displayName,
+                  username: username,
+                  className: className,
+                  classOptions: classOptions,
+                  selectedClassId: selectedClassId,
+                  classOptionsLoading: myClassOptionsAsync.isLoading,
+                  classOptionsError: myClassOptionsAsync.hasError
+                      ? myClassOptionsAsync.error.toString()
+                      : null,
+                  onSelectClass: selectClass,
+                  onNavigate: navigateTo,
+                  onLogout: logout,
+                ),
               ),
             ),
-            Expanded(
-              child: Column(
+            body: Padding(
+              padding: contentPadding,
+              child: child,
+            ),
+          )
+        : Scaffold(
+            backgroundColor: AppColors.bgBase,
+            body: SafeArea(
+              child: Row(
                 children: <Widget>[
-                  _DesktopHeader(
-                    title: title,
-                    subtitle: subtitle,
-                    actions: actions,
+                  SizedBox(
+                    width: 286,
+                    child: _StudentSidebar(
+                      activeSection: activeSection,
+                      displayName: displayName,
+                      username: username,
+                      className: className,
+                      classOptions: classOptions,
+                      selectedClassId: selectedClassId,
+                      classOptionsLoading: myClassOptionsAsync.isLoading,
+                      classOptionsError: myClassOptionsAsync.hasError
+                          ? myClassOptionsAsync.error.toString()
+                          : null,
+                      onSelectClass: selectClass,
+                      onNavigate: navigateTo,
+                      onLogout: logout,
+                    ),
                   ),
                   Expanded(
-                    child: Padding(
-                      padding: contentPadding,
-                      child: child,
+                    child: Column(
+                      children: <Widget>[
+                        _DesktopHeader(
+                          title: title,
+                          subtitle: subtitle,
+                          actions: actions,
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: contentPadding,
+                            child: child,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
+          );
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) {
+          return;
+        }
+        await handleBackPressed();
+      },
+      child: scaffold,
     );
   }
 }
@@ -205,6 +293,11 @@ class _StudentSidebar extends StatelessWidget {
     required this.displayName,
     required this.username,
     required this.className,
+    required this.classOptions,
+    required this.selectedClassId,
+    required this.classOptionsLoading,
+    required this.classOptionsError,
+    required this.onSelectClass,
     required this.onNavigate,
     required this.onLogout,
   });
@@ -213,6 +306,11 @@ class _StudentSidebar extends StatelessWidget {
   final String displayName;
   final String username;
   final String className;
+  final List<StudentClassOption> classOptions;
+  final String? selectedClassId;
+  final bool classOptionsLoading;
+  final String? classOptionsError;
+  final ValueChanged<String?> onSelectClass;
   final ValueChanged<String> onNavigate;
   final VoidCallback onLogout;
 
@@ -373,6 +471,44 @@ class _StudentSidebar extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
+                    if (classOptionsLoading)
+                      Text(
+                        'Memuat daftar kelas...',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      )
+                    else if (classOptionsError != null &&
+                        classOptionsError!.trim().isNotEmpty)
+                      Text(
+                        'Daftar kelas belum bisa dimuat.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
+                      )
+                    else if (classOptions.isNotEmpty)
+                      DropdownButtonFormField<String>(
+                        initialValue: classOptions.any(
+                          (item) => item.id == selectedClassId,
+                        )
+                            ? selectedClassId
+                            : classOptions.first.id,
+                        decoration: const InputDecoration(
+                          labelText: 'Pilih Kelas Akses',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: classOptions
+                            .map(
+                              (item) => DropdownMenuItem<String>(
+                                value: item.id,
+                                child: Text(item.name),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: onSelectClass,
+                      ),
+                    const SizedBox(height: AppSpacing.sm),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -450,6 +586,30 @@ Future<bool> _showLogoutConfirmationDialog(BuildContext context) async {
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Ya, Keluar'),
+          ),
+        ],
+      );
+    },
+  );
+
+  return result ?? false;
+}
+
+Future<bool> _showExitAppConfirmationDialog(BuildContext context) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Keluar Aplikasi'),
+        content: const Text('Apakah anda ingin keluar aplikasi?'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Tidak'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Ya'),
           ),
         ],
       );

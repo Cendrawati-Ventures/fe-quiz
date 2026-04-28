@@ -1,12 +1,15 @@
 import 'dart:async';
 
+import '../../../app/student_route_history_state.dart';
 import '../../../core/auth/auth_event_bus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_error.dart';
 import '../../../core/storage/secure_storage.dart';
+import '../../exam/service/classroom_service.dart';
 import '../../exam/state/exam_state.dart';
+import '../../exam/state/student_class_scope_state.dart';
 import '../../exam_monitoring/state/student_monitoring_state.dart';
 import '../model/auth_user.dart';
 import '../model/login_request.dart';
@@ -172,10 +175,13 @@ class AuthNotifier extends Notifier<AuthState> {
           .stop(markFinished: false);
       _apiClient.setAuthToken(null);
       await _secureStorage.clearAuthSession();
+      await ref.read(studentSelectedClassIdProvider.notifier).clear();
+      await ref.read(studentRouteHistoryProvider.notifier).clear();
       ref.invalidate(examListProvider);
       ref.invalidate(subjectListProvider);
       ref.invalidate(myResultsProvider);
       ref.invalidate(adminResultsProvider);
+      ref.invalidate(myClassOptionsProvider);
       state = const AuthState(status: AuthStatus.unauthenticated);
       await ref.read(examSessionProvider.notifier).clearSession();
     } finally {

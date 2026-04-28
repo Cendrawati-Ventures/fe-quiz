@@ -149,10 +149,16 @@ class ExamService {
     }
   }
 
-  Future<List<ApiSubject>> listSubjects() async {
+  Future<List<ApiSubject>> listSubjects({String? classId}) async {
+    final queryParameters = <String, dynamic>{};
+    if (classId != null && classId.trim().isNotEmpty) {
+      queryParameters['classId'] = classId.trim();
+    }
+
     try {
       final response = await _dio.get<dynamic>(
         '/api/subjects',
+        queryParameters: queryParameters.isEmpty ? null : queryParameters,
         options: _readOptions(),
       );
       final data = response.data;
@@ -370,12 +376,16 @@ class ExamService {
   Future<StartAttemptResponse> startAttempt({
     required String subjectId,
     String? examId,
+    String? classId,
   }) async {
     final payload = <String, dynamic>{
       'subjectId': subjectId,
     };
     if (examId != null && examId.trim().isNotEmpty) {
       payload['examId'] = examId;
+    }
+    if (classId != null && classId.trim().isNotEmpty) {
+      payload['classId'] = classId.trim();
     }
 
     try {
@@ -389,6 +399,54 @@ class ExamService {
         return StartAttemptResponse.fromJson(data);
       }
       throw ApiError(message: 'Ujian belum bisa dimulai.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<ProctoringStandbyStatus> getProctoringStandbyStatus() async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/proctoring/standby',
+        options: _readOptions(),
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return ProctoringStandbyStatus.fromJson(data);
+      }
+      throw ApiError(message: 'Status standby pengawas tidak valid.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<ProctoringStandbyStatus> activateProctoringStandby() async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/proctoring/standby/activate',
+        options: _writeOptions(),
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return ProctoringStandbyStatus.fromJson(data);
+      }
+      throw ApiError(message: 'Aktivasi standby pengawas gagal diproses.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<ProctoringStandbyStatus> deactivateProctoringStandby() async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/proctoring/standby/deactivate',
+        options: _writeOptions(),
+      );
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return ProctoringStandbyStatus.fromJson(data);
+      }
+      throw ApiError(message: 'Menonaktifkan standby pengawas gagal diproses.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }

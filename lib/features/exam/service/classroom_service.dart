@@ -21,6 +21,12 @@ final classDetailProvider =
   return service.getClassDetail(classId);
 });
 
+final myClassOptionsProvider =
+    FutureProvider<List<StudentClassOption>>((ref) async {
+  final service = ref.watch(classroomServiceProvider);
+  return service.listMyClasses();
+});
+
 class ClassroomService {
   ClassroomService(this._dio);
 
@@ -37,6 +43,23 @@ class ClassroomService {
             .toList();
       }
       throw ApiError(message: 'Daftar kelas tidak valid.');
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
+  Future<List<StudentClassOption>> listMyClasses() async {
+    try {
+      final response = await _dio.get<dynamic>('/classes/me');
+      final data = response.data;
+      if (data is List<dynamic>) {
+        return data
+            .whereType<Map<String, dynamic>>()
+            .map(StudentClassOption.fromJson)
+            .where((item) => item.id.trim().isNotEmpty)
+            .toList();
+      }
+      throw ApiError(message: 'Daftar kelas siswa tidak valid.');
     } on DioException catch (error) {
       throw ApiError.fromDioException(error);
     }

@@ -59,3 +59,20 @@ class AdminClassDetail {
     );
   }
 }
+
+class StudentClassOption {
+  const StudentClassOption({
+    required this.id,
+    required this.name,
+  });
+
+  final String id;
+  final String name;
+
+  factory StudentClassOption.fromJson(Map<String, dynamic> json) {
+    return StudentClassOption(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+    );
+  }
+}
