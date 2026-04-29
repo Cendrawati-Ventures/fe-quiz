@@ -636,24 +636,46 @@ class _StudentMonitoringCardState extends State<_StudentMonitoringCard> {
         }
 
         final expectedUid = widget.attempt.monitoring.agoraPublisherUid;
-        if (expectedUid != null && !remoteUids.contains(expectedUid)) {
-          return _InfoPanel(
-            message:
-                'Menunggu stream siswa ini.\nStream aktif lain terdeteksi: ${remoteUids.length}.',
-          );
-        }
-
-        final preferredUid = expectedUid ?? remoteUids.first;
+        final expectedAvailable =
+            expectedUid != null && remoteUids.contains(expectedUid);
+        final preferredUid =
+            expectedAvailable ? expectedUid : remoteUids.first;
         return ClipRRect(
           borderRadius: BorderRadius.circular(10),
-          child: AgoraVideoView(
-            controller: VideoViewController.remote(
-              rtcEngine: engine,
-              canvas: VideoCanvas(uid: preferredUid),
-              connection: RtcConnection(
-                channelId: _controller.channelName ?? '',
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              AgoraVideoView(
+                controller: VideoViewController.remote(
+                  rtcEngine: engine,
+                  canvas: VideoCanvas(uid: preferredUid),
+                  connection: RtcConnection(
+                    channelId: _controller.channelName ?? '',
+                  ),
+                ),
               ),
-            ),
+              if (expectedUid != null && !expectedAvailable)
+                Positioned(
+                  left: 8,
+                  right: 8,
+                  bottom: 8,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'UID target $expectedUid belum tampil, menampilkan stream UID $preferredUid.',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
       },

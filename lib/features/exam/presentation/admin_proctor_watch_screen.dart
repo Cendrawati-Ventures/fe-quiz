@@ -58,6 +58,11 @@ class _AdminProctorWatchScreenState extends State<AdminProctorWatchScreen> {
     );
   }
 
+  Future<void> _retryWatching() async {
+    await _controller.close();
+    await _startWatching();
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -70,6 +75,11 @@ class _AdminProctorWatchScreenState extends State<AdminProctorWatchScreen> {
           appBar: AppBar(
             title: Text('Pantau ${widget.attempt.student.labelName}'),
             actions: <Widget>[
+              IconButton(
+                tooltip: 'Ulangi koneksi',
+                onPressed: _controller.isStarting ? null : _retryWatching,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
               Padding(
                 padding: const EdgeInsets.only(right: AppSpacing.sm),
                 child: Center(
@@ -95,11 +105,55 @@ class _AdminProctorWatchScreenState extends State<AdminProctorWatchScreen> {
                 Expanded(
                   child: _buildVideoPanel(engine),
                 ),
+                const SizedBox(height: AppSpacing.sm),
+                _buildDiagnosticPanel(),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildDiagnosticPanel() {
+    final monitoring = widget.attempt.monitoring;
+    final remoteUidText = _controller.remoteUids.value.isEmpty
+        ? '-'
+        : _controller.remoteUids.value.join(', ');
+    final errorText = _controller.errorMessage?.trim();
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Diagnostik Monitoring',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text('Channel: ${monitoring.agoraChannel ?? '-'}'),
+          Text('UID Admin Viewer: ${monitoring.agoraUid ?? '-'}'),
+          Text('UID Publisher Siswa: ${monitoring.agoraPublisherUid ?? '-'}'),
+          Text('Remote UID Terdeteksi: $remoteUidText'),
+          Text(
+              'Koneksi: ${_connectionLabel(_controller.connectionState.value)}'),
+          Text(
+            'Token: ${monitoring.agoraToken == null || monitoring.agoraToken!.isEmpty ? 'Kosong' : 'Ada'}',
+          ),
+          if (errorText != null && errorText.isNotEmpty)
+            Text(
+              'Error: $errorText',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+        ],
+      ),
     );
   }
 
@@ -137,36 +191,50 @@ class _AdminProctorWatchScreenState extends State<AdminProctorWatchScreen> {
         }
 
         final expectedUid = widget.attempt.monitoring.agoraPublisherUid;
-        if (expectedUid != null && !remoteUids.contains(expectedUid)) {
-          return Container(
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Text(
-                'Stream siswa ini belum masuk.\nStream aktif lain terdeteksi: ${remoteUids.length}.',
-                textAlign: TextAlign.center,
-              ),
-            ),
-          );
-        }
+        final expectedAvailable =
+            expectedUid != null && remoteUids.contains(expectedUid);
+        final preferredUid =
+            expectedAvailable ? expectedUid : remoteUids.first;
 
         if (expectedUid != null) {
           return ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: AgoraVideoView(
-              controller: VideoViewController.remote(
-                rtcEngine: engine,
-                canvas: VideoCanvas(uid: expectedUid),
-                connection: RtcConnection(
-                  channelId: _controller.channelName ?? '',
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                AgoraVideoView(
+                  controller: VideoViewController.remote(
+                    rtcEngine: engine,
+                    canvas: VideoCanvas(uid: preferredUid),
+                    connection: RtcConnection(
+                      channelId: _controller.channelName ?? '',
+                    ),
+                  ),
                 ),
-              ),
+                if (!expectedAvailable)
+                  Positioned(
+                    left: 8,
+                    right: 8,
+                    bottom: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'UID target $expectedUid belum tampil, menampilkan stream UID $preferredUid.',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           );
         }
@@ -211,6 +279,23 @@ class _AdminProctorWatchScreenState extends State<AdminProctorWatchScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(error)),
     );
+  }
+
+  String _connectionLabel(AgoraServiceConnectionState state) {
+    switch (state) {
+      case AgoraServiceConnectionState.connected:
+        return 'Terhubung';
+      case AgoraServiceConnectionState.connecting:
+        return 'Menghubungkan';
+      case AgoraServiceConnectionState.reconnecting:
+        return 'Sambung ulang';
+      case AgoraServiceConnectionState.disconnected:
+        return 'Terputus';
+      case AgoraServiceConnectionState.failed:
+        return 'Gagal';
+      case AgoraServiceConnectionState.idle:
+        return 'Idle';
+    }
   }
 }
 

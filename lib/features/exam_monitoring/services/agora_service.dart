@@ -69,6 +69,11 @@ class AgoraService {
           channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
         ),
       );
+      try {
+        await engine.enableWebSdkInteroperability(true);
+      } catch (_) {
+        // Beberapa platform/build tidak membutuhkan atau tidak mendukung call ini.
+      }
       engine.registerEventHandler(_buildEventHandler());
       await engine.enableVideo();
       await engine.enableAudio();
