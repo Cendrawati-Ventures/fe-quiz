@@ -9,6 +9,7 @@ import '../../../../app/theme/spacing.dart';
 import '../../model/classroom_models.dart';
 import '../../service/classroom_service.dart';
 import '../../state/student_class_scope_state.dart';
+import '../../../auth/model/auth_user.dart';
 import '../../../auth/state/auth_provider.dart';
 
 enum StudentSection { exams, results }
@@ -62,6 +63,14 @@ class StudentLayout extends ConsumerWidget {
       break;
     }
     final className = selectedClassName ?? fallbackClassName;
+    final isAuthLoading = ref.watch(
+      authProvider.select(
+        (state) =>
+            state.status == AuthStatus.authenticated && state.isLoading,
+      ),
+    );
+    final canDeleteAccount =
+        user?.role == UserRole.admin || user?.role == UserRole.siswa;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref
@@ -75,6 +84,22 @@ class StudentLayout extends ConsumerWidget {
         return;
       }
       await ref.read(authProvider.notifier).logout();
+    }
+
+    Future<void> deleteAccount() async {
+      final confirmed = await _showDeleteAccountConfirmationDialog(context);
+      if (!context.mounted || !confirmed) {
+        return;
+      }
+      final error = await ref.read(authProvider.notifier).deleteAccount();
+      if (!context.mounted) {
+        return;
+      }
+      if (error != null && error.trim().isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+      }
     }
 
     Future<void> selectClass(String? classId) async {
@@ -140,8 +165,11 @@ class StudentLayout extends ConsumerWidget {
                   classOptionsError: myClassOptionsAsync.hasError
                       ? myClassOptionsAsync.error.toString()
                       : null,
+                  isAuthLoading: isAuthLoading,
+                  canDeleteAccount: canDeleteAccount,
                   onSelectClass: selectClass,
                   onNavigate: navigateTo,
+                  onDeleteAccount: deleteAccount,
                   onLogout: logout,
                 ),
               ),
@@ -169,8 +197,11 @@ class StudentLayout extends ConsumerWidget {
                       classOptionsError: myClassOptionsAsync.hasError
                           ? myClassOptionsAsync.error.toString()
                           : null,
+                      isAuthLoading: isAuthLoading,
+                      canDeleteAccount: canDeleteAccount,
                       onSelectClass: selectClass,
                       onNavigate: navigateTo,
+                      onDeleteAccount: deleteAccount,
                       onLogout: logout,
                     ),
                   ),
@@ -297,8 +328,11 @@ class _StudentSidebar extends StatelessWidget {
     required this.selectedClassId,
     required this.classOptionsLoading,
     required this.classOptionsError,
+    required this.isAuthLoading,
+    required this.canDeleteAccount,
     required this.onSelectClass,
     required this.onNavigate,
+    required this.onDeleteAccount,
     required this.onLogout,
   });
 
@@ -310,8 +344,11 @@ class _StudentSidebar extends StatelessWidget {
   final String? selectedClassId;
   final bool classOptionsLoading;
   final String? classOptionsError;
+  final bool isAuthLoading;
+  final bool canDeleteAccount;
   final ValueChanged<String?> onSelectClass;
   final ValueChanged<String> onNavigate;
+  final VoidCallback onDeleteAccount;
   final VoidCallback onLogout;
 
   @override
@@ -517,6 +554,20 @@ class _StudentSidebar extends StatelessWidget {
                         label: const Text('Keluar'),
                       ),
                     ),
+                    if (canDeleteAccount) ...<Widget>[
+                      const SizedBox(height: AppSpacing.xs),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: isAuthLoading ? null : onDeleteAccount,
+                          icon: const Icon(Icons.delete_forever_rounded,
+                              size: 18),
+                          label: Text(
+                            isAuthLoading ? 'Memproses...' : 'Hapus Akun',
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -586,6 +637,32 @@ Future<bool> _showLogoutConfirmationDialog(BuildContext context) async {
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Ya, Keluar'),
+          ),
+        ],
+      );
+    },
+  );
+
+  return result ?? false;
+}
+
+Future<bool> _showDeleteAccountConfirmationDialog(BuildContext context) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Hapus Akun'),
+        content: const Text(
+          'Akun ini akan dihapus permanen beserta data terkait. Lanjutkan?',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Ya, Hapus'),
           ),
         ],
       );

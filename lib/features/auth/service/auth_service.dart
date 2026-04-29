@@ -102,4 +102,19 @@ class AuthService {
       throw ApiError.fromDioException(error);
     }
   }
+
+  Future<void> deleteMyAccount() async {
+    try {
+      await _dio.delete<dynamic>(
+        '/users/me',
+        options: Options(
+          connectTimeout: _authConnectTimeout,
+          sendTimeout: _authSendTimeout,
+          receiveTimeout: _authReceiveTimeout,
+        ),
+      );
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
 }

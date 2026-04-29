@@ -356,6 +356,27 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  Future<String?> deleteAccount() async {
+    final currentUser = state.user;
+    if (state.status != AuthStatus.authenticated || currentUser == null) {
+      return 'Sesi login tidak ditemukan. Silakan login ulang.';
+    }
+
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await _service.deleteMyAccount();
+      await _invalidateSession();
+      return null;
+    } on ApiError catch (error) {
+      state = state.copyWith(isLoading: false, errorMessage: error.message);
+      return error.message;
+    } catch (_) {
+      const message = 'Akun belum berhasil dihapus. Coba lagi.';
+      state = state.copyWith(isLoading: false, errorMessage: message);
+      return message;
+    }
+  }
+
   Future<void> logout() async {
     await _invalidateSession();
   }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/colors.dart';
 import '../../../../app/theme/spacing.dart';
+import '../../../auth/model/auth_user.dart';
 import '../../../auth/state/auth_provider.dart';
 
 enum AdminSection {
@@ -44,6 +45,8 @@ class AdminLayout extends ConsumerWidget {
     final username = user?.username ?? 'admin';
     final isUpdatingDisplayName = ref.watch(authProvider.select((state) =>
         state.status == AuthStatus.authenticated && state.isLoading));
+    final canDeleteAccount =
+        user?.role == UserRole.admin || user?.role == UserRole.siswa;
 
     void logout() async {
       final confirmed = await _showLogoutConfirmationDialog(
@@ -90,6 +93,27 @@ class AdminLayout extends ConsumerWidget {
       );
     }
 
+    void deleteAccount() async {
+      final confirmed = await _showDeleteAccountConfirmationDialog(
+        context,
+        roleLabel: 'admin',
+      );
+      if (!context.mounted || !confirmed) {
+        return;
+      }
+
+      final error = await ref.read(authProvider.notifier).deleteAccount();
+      if (!context.mounted) {
+        return;
+      }
+
+      if (error != null && error.trim().isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+      }
+    }
+
     if (!isDesktop) {
       return Scaffold(
         appBar: AppBar(
@@ -103,7 +127,9 @@ class AdminLayout extends ConsumerWidget {
               displayName: displayName,
               username: username,
               isUpdatingDisplayName: isUpdatingDisplayName,
+              canDeleteAccount: canDeleteAccount,
               onEditDisplayName: editDisplayName,
+              onDeleteAccount: deleteAccount,
               onNavigate: navigateTo,
               onLogout: logout,
             ),
@@ -127,7 +153,9 @@ class AdminLayout extends ConsumerWidget {
                 displayName: displayName,
                 username: username,
                 isUpdatingDisplayName: isUpdatingDisplayName,
+                canDeleteAccount: canDeleteAccount,
                 onEditDisplayName: editDisplayName,
+                onDeleteAccount: deleteAccount,
                 onNavigate: navigateTo,
                 onLogout: logout,
               ),
@@ -241,7 +269,9 @@ class _AdminSidebar extends StatelessWidget {
     required this.displayName,
     required this.username,
     required this.isUpdatingDisplayName,
+    required this.canDeleteAccount,
     required this.onEditDisplayName,
+    required this.onDeleteAccount,
     required this.onNavigate,
     required this.onLogout,
   });
@@ -250,7 +280,9 @@ class _AdminSidebar extends StatelessWidget {
   final String displayName;
   final String username;
   final bool isUpdatingDisplayName;
+  final bool canDeleteAccount;
   final VoidCallback onEditDisplayName;
+  final VoidCallback onDeleteAccount;
   final ValueChanged<String> onNavigate;
   final VoidCallback onLogout;
 
@@ -465,6 +497,23 @@ class _AdminSidebar extends StatelessWidget {
                         label: const Text('Keluar'),
                       ),
                     ),
+                    if (canDeleteAccount) ...<Widget>[
+                      const SizedBox(height: AppSpacing.xs),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed:
+                              isUpdatingDisplayName ? null : onDeleteAccount,
+                          icon: const Icon(Icons.delete_forever_rounded,
+                              size: 18),
+                          label: Text(
+                            isUpdatingDisplayName
+                                ? 'Memproses...'
+                                : 'Hapus Akun',
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -621,6 +670,35 @@ Future<bool> _showLogoutConfirmationDialog(
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Ya, Keluar'),
+          ),
+        ],
+      );
+    },
+  );
+
+  return result ?? false;
+}
+
+Future<bool> _showDeleteAccountConfirmationDialog(
+  BuildContext context, {
+  required String roleLabel,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Hapus Akun'),
+        content: Text(
+          'Akun $roleLabel akan dihapus permanen beserta data terkait. Lanjutkan?',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Ya, Hapus'),
           ),
         ],
       );

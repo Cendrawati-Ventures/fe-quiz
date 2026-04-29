@@ -625,6 +625,17 @@ class ExamService {
     }
   }
 
+  Future<void> discardAttempt(String attemptId) async {
+    try {
+      await _dio.post<dynamic>(
+        '/attempts/$attemptId/discard',
+        options: _submitOptions(),
+      );
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
   Future<List<ResultResponse>> getMyResults() async {
     try {
       final response = await _dio.get<dynamic>(

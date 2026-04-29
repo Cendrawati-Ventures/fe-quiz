@@ -160,6 +160,32 @@ class _StudentExamPrecheckScreenState
               Row(
                 children: <Widget>[
                   Expanded(
+                    child: TextButton(
+                      onPressed: isStarting
+                          ? null
+                          : () async {
+                              final discardError =
+                                  await notifier.discardAttemptBeforeStart();
+                              if (discardError != null) {
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(discardError)),
+                                );
+                                return;
+                              }
+                              await monitoringSession.stop(markFinished: false);
+                              if (!context.mounted) {
+                                return;
+                              }
+                              context.go('/exam');
+                            },
+                      child: const Text('Batal'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
                     child: OutlinedButton(
                       onPressed: isStarting
                           ? null

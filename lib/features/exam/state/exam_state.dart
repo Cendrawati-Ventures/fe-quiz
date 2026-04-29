@@ -757,6 +757,24 @@ class ExamSessionNotifier extends Notifier<ExamSessionState> {
     await _persistSession();
   }
 
+  Future<String?> discardAttemptBeforeStart() async {
+    final attempt = state.attempt;
+    if (attempt == null) {
+      await clearSession();
+      return null;
+    }
+
+    try {
+      await _service.discardAttempt(attempt.id);
+      await clearSession();
+      return null;
+    } on ApiError catch (error) {
+      return error.message;
+    } catch (_) {
+      return 'Sesi ujian belum berhasil dibatalkan. Coba lagi.';
+    }
+  }
+
   void previousQuestion() {
     if (state.questions.isEmpty) {
       return;
