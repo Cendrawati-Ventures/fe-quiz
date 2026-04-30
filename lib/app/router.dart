@@ -22,6 +22,7 @@ import '../features/exam/model/exam_models.dart';
 import '../features/exam/presentation/result_screen.dart';
 import '../features/exam/state/exam_state.dart';
 import '../features/exam_monitoring/presentation/student_exam_precheck_screen.dart';
+import '../features/legal/presentation/privacy_policy_screen.dart';
 import 'route_guard.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -36,6 +37,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/login',
         name: 'login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/privacy-policy',
+        name: 'privacy-policy',
+        builder: (context, state) => const PrivacyPolicyScreen(),
       ),
       GoRoute(
         path: '/exam',

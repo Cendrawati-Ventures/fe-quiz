@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/spacing.dart';
@@ -22,12 +23,65 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
+  String _appUpdateSerial = '1.0.0.0';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppUpdateSerial();
+  }
 
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadAppUpdateSerial() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final serial = _buildUpdateSerial(
+        packageInfo.version,
+        packageInfo.buildNumber,
+      );
+      if (!mounted) return;
+      setState(() {
+        _appUpdateSerial = serial;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _appUpdateSerial = _buildUpdateSerial('1.0.0', '0');
+      });
+    }
+  }
+
+  String _buildUpdateSerial(String version, String buildNumber) {
+    final versionParts = version
+        .split('.')
+        .map(_extractNumericChunk)
+        .where((part) => part.isNotEmpty)
+        .toList();
+    while (versionParts.length < 3) {
+      versionParts.add('0');
+    }
+    final major = versionParts.isNotEmpty ? versionParts[0] : '0';
+    final minor = versionParts.length > 1 ? versionParts[1] : '0';
+    final patch = versionParts.length > 2 ? versionParts[2] : '0';
+    final buildPart = _extractNumericChunk(buildNumber);
+    final build = buildPart.isNotEmpty
+        ? buildPart
+        : (versionParts.length > 3 ? versionParts[3] : '0');
+    return '$major.$minor.$patch.$build';
+  }
+
+  String _extractNumericChunk(String value) {
+    final match = RegExp(r'\d+').firstMatch(value.trim());
+    if (match == null) {
+      return '';
+    }
+    return '${int.parse(match.group(0)!)}';
   }
 
   Future<void> _onLoginPressed() async {
@@ -136,6 +190,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             );
           },
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+          child: Text(
+            'Nomor Seri Update $_appUpdateSerial',
+            textAlign: TextAlign.center,
+            style: textTheme.labelMedium?.copyWith(
+              color: const Color(0xFF6F664F),
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ),
     );
@@ -404,7 +473,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Align(
                 alignment: Alignment.bottomCenter,
                 child: Text(
-                  'QUIZ-BALI-Q_TA  V1.0.0',
+                  'Nomor Seri Update $_appUpdateSerial',
                   style: textTheme.labelLarge?.copyWith(
                     color: Colors.white.withValues(alpha: 0.86),
                     letterSpacing: 1.6,
@@ -485,7 +554,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'QUIZ-BALI-Q_TA V1.0.0',
+                  'Nomor Seri Update $_appUpdateSerial',
                   style: textTheme.labelMedium?.copyWith(
                     color: Colors.white.withValues(alpha: 0.9),
                     letterSpacing: 1,
@@ -637,6 +706,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 style: textTheme.bodyMedium?.copyWith(
                   color: const Color(0xFF76684D),
                 ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => context.push('/privacy-policy'),
+                icon: const Icon(Icons.privacy_tip_outlined, size: 18),
+                label: const Text('Kebijakan Privasi'),
               ),
             ),
           ],

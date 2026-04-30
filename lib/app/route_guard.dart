@@ -8,6 +8,7 @@ String? authRedirect(Ref ref, GoRouterState state) {
   final authState = ref.read(authProvider);
   final sessionState = ref.read(examSessionProvider);
   final path = state.matchedLocation;
+  final isPublicRoute = path == '/login' || path == '/privacy-policy';
   final isLoginRoute = path == '/login';
   final isAdminRoute = path.startsWith('/admin');
   final isExamSessionRoute = path.startsWith('/exam/session');
@@ -18,7 +19,7 @@ String? authRedirect(Ref ref, GoRouterState state) {
     return null;
   }
 
-  if (authState.status == AuthStatus.unauthenticated && !isLoginRoute) {
+  if (authState.status == AuthStatus.unauthenticated && !isPublicRoute) {
     return '/login';
   }
 
