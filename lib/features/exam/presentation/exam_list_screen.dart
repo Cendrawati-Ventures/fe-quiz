@@ -938,7 +938,7 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
       return;
     }
 
-    final attemptNumber = attemptsUsed + 1;
+    final nextAttemptNumber = attemptsUsed + 1;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -951,7 +951,9 @@ class _ExamListScreenState extends ConsumerState<ExamListScreen> {
               Text('Ujian: ${subject.name}'),
               const SizedBox(height: AppSpacing.xs),
               Text('Durasi: ${subject.durationMinutes} menit'),
-              Text('Percobaan: $attemptNumber dari ${subject.attemptLimit}'),
+              Text(
+                  'Percobaan saat ini: $attemptsUsed dari ${subject.attemptLimit}'),
+              Text('Percobaan berikutnya: $nextAttemptNumber'),
               Text('Jumlah soal: ${stat.questionCount}'),
               Text('Bobot: ${_formatWeight(stat.totalWeight)}/100'),
               const SizedBox(height: AppSpacing.sm),
