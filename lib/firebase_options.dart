@@ -26,10 +26,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -58,5 +55,15 @@ class DefaultFirebaseOptions {
     messagingSenderId: '637225767851',
     projectId: 'quiz-q-ta',
     storageBucket: 'quiz-q-ta.firebasestorage.app',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyBkwYmKZGEOGPk6esuVmuqDOPHeb3lzOos',
+    appId: '1:637225767851:ios:9da1eeeec0b405138a78ee',
+    messagingSenderId: '637225767851',
+    projectId: 'quiz-q-ta',
+    databaseURL: 'https://quiz-q-ta-default-rtdb.firebaseio.com',
+    storageBucket: 'quiz-q-ta.firebasestorage.app',
+    iosBundleId: 'com.nusadex.onlineExamSystem',
   );
 }

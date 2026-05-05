@@ -64,15 +64,26 @@ class StudentExamController extends ChangeNotifier {
     await _attachServiceErrorListeners();
 
     try {
-      await _realtimeStatusService.initialize(
-        sessionId: config.sessionId,
-        studentId: config.studentId,
-        studentName: config.studentName,
-        databaseUrl: config.firebaseDatabaseUrl,
-        device: config.device,
-        initialViolations: config.initialViolations,
-      );
-      await _realtimeStatusService.setStatus(ExamStudentStatus.active);
+      var realtimeReady = false;
+      try {
+        await _realtimeStatusService.initialize(
+          sessionId: config.sessionId,
+          studentId: config.studentId,
+          studentName: config.studentName,
+          databaseUrl: config.firebaseDatabaseUrl,
+          device: config.device,
+          initialViolations: config.initialViolations,
+        );
+        await _realtimeStatusService.setStatus(ExamStudentStatus.active);
+        realtimeReady = true;
+      } on ServiceException catch (error) {
+        if (!_canRunWithoutRealtime(error)) {
+          rethrow;
+        }
+        _setError(
+          'Monitoring realtime Firebase belum aktif di iOS. Kamera/mikrofon tetap digunakan untuk ujian.',
+        );
+      }
 
       await _agoraService.initialize(appId: config.agoraAppId);
       await _agoraService.joinChannel(
@@ -91,7 +102,7 @@ class StudentExamController extends ChangeNotifier {
       );
 
       _status = ExamStudentStatus.active;
-      _violations = _realtimeStatusService.violations;
+      _violations = realtimeReady ? _realtimeStatusService.violations : 0;
       _isReady = true;
       _isFinished = false;
     } on ServiceException catch (error) {
@@ -120,7 +131,9 @@ class StudentExamController extends ChangeNotifier {
 
     try {
       await _antiCheatService.stop();
-      await _realtimeStatusService.markFinished();
+      if (_realtimeStatusService.isInitialized) {
+        await _realtimeStatusService.markFinished();
+      }
       await _agoraService.leaveChannel();
       await _agoraService.dispose();
 
@@ -202,7 +215,7 @@ class StudentExamController extends ChangeNotifier {
   }
 
   Future<void> _handleLeftApp() async {
-    if (!_isReady || _isFinished) {
+    if (!_isReady || _isFinished || !_realtimeStatusService.isInitialized) {
       return;
     }
 
@@ -222,7 +235,7 @@ class StudentExamController extends ChangeNotifier {
   }
 
   Future<void> _handleResumedActive() async {
-    if (!_isReady || _isFinished) {
+    if (!_isReady || _isFinished || !_realtimeStatusService.isInitialized) {
       return;
     }
 
@@ -311,6 +324,10 @@ class StudentExamController extends ChangeNotifier {
       return;
     }
     notifyListeners();
+  }
+
+  bool _canRunWithoutRealtime(ServiceException error) {
+    return error.code == 'realtime.unsupported_platform';
   }
 
   @override

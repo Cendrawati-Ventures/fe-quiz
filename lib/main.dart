@@ -16,11 +16,15 @@ Future<void> _initializeFirebase() async {
     return;
   }
 
-  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+  if (kIsWeb) {
     return;
   }
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on UnsupportedError {
+    // Platform belum terkonfigurasi di firebase_options.dart.
+  }
 }

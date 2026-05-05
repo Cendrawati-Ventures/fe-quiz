@@ -429,17 +429,20 @@ class RealtimeStatusService {
   Future<void> _ensureFirebaseInitialized() async {
     try {
       if (Firebase.apps.isEmpty) {
-        if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+        if (kIsWeb) {
           throw const ServiceException(
             'Firebase monitoring belum dikonfigurasi untuk platform ini.',
             code: 'realtime.unsupported_platform',
           );
         }
 
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
       }
+    } on UnsupportedError {
+      throw const ServiceException(
+        'Firebase monitoring belum dikonfigurasi untuk platform ini.',
+        code: 'realtime.unsupported_platform',
+      );
     } on ServiceException {
       rethrow;
     } catch (error, stackTrace) {

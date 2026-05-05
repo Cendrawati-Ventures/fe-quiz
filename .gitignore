@@ -5,9 +5,11 @@
 *.swp
 .DS_Store
 .atom/
+.build/
 .buildlog/
 .history
 .svn/
+.swiftpm/
 migrate_working_dir/
 
 # IntelliJ related
@@ -55,16 +57,15 @@ app.*.map.json
 # Env
 .env
 .env.*
-pubspec.lock
 windows/flutter/generated_plugin_registrant.cc
 windows/flutter/generated_plugin_registrant.h
 windows/flutter/generated_plugins.cmake
-pubspec.lock
-ios/Podfile
 ios/Flutter/flutter_export_environment.sh
 ios/Flutter/Generated.xcconfig
 ios/Flutter/ephemeral/flutter_lldb_helper.py
 ios/Flutter/ephemeral/flutter_lldbinit
 ios/Runner/GeneratedPluginRegistrant.h
 ios/Runner/GeneratedPluginRegistrant.m
-pubspec.lock
+ios/Pods/
+ios/Podfile.lock
+ios_backup_*/
