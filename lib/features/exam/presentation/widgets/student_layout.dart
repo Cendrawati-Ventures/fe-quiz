@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/student_route_history_state.dart';
 import '../../../../app/theme/colors.dart';
 import '../../../../app/theme/spacing.dart';
+import '../../../../shared/components/app_exit_confirmation.dart';
 import '../../model/classroom_models.dart';
 import '../../service/classroom_service.dart';
 import '../../state/student_class_scope_state.dart';
@@ -129,19 +129,15 @@ class StudentLayout extends ConsumerWidget {
       if (!context.mounted) {
         return;
       }
-      final shouldExit = await _showExitAppConfirmationDialog(context);
-      if (!context.mounted || !shouldExit) {
-        return;
-      }
-      await SystemNavigator.pop();
+      await confirmExitApp(context);
     }
 
     void navigateTo(String path) {
-      if (GoRouterState.of(context).matchedLocation != path) {
-        context.go(path);
-      }
       if (!isDesktop && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
+      }
+      if (GoRouterState.of(context).matchedLocation != path) {
+        context.go(path);
       }
     }
 
@@ -663,30 +659,6 @@ Future<bool> _showDeleteAccountConfirmationDialog(BuildContext context) async {
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Ya, Hapus'),
-          ),
-        ],
-      );
-    },
-  );
-
-  return result ?? false;
-}
-
-Future<bool> _showExitAppConfirmationDialog(BuildContext context) async {
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: const Text('Keluar Aplikasi'),
-        content: const Text('Apakah anda ingin keluar aplikasi?'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Tidak'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Ya'),
           ),
         ],
       );
