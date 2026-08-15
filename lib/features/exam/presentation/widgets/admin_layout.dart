@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/colors.dart';
 import '../../../../app/theme/spacing.dart';
+import '../../../../shared/components/app_exit_confirmation.dart';
 import '../../../auth/model/auth_user.dart';
 import '../../../auth/state/auth_provider.dart';
 
@@ -60,11 +61,11 @@ class AdminLayout extends ConsumerWidget {
     }
 
     void navigateTo(String path) {
-      if (GoRouterState.of(context).matchedLocation != path) {
-        context.go(path);
-      }
       if (!isDesktop && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
+      }
+      if (GoRouterState.of(context).matchedLocation != path) {
+        context.push(path);
       }
     }
 
@@ -114,8 +115,23 @@ class AdminLayout extends ConsumerWidget {
       }
     }
 
+    Widget handleSystemBack(Widget child) => PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) {
+              return;
+            }
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+              return;
+            }
+            await confirmExitApp(context);
+          },
+          child: child,
+        );
+
     if (!isDesktop) {
-      return Scaffold(
+      final scaffold = Scaffold(
         appBar: AppBar(
           title: Text(title),
           actions: actions,
@@ -140,9 +156,10 @@ class AdminLayout extends ConsumerWidget {
           child: child,
         ),
       );
+      return handleSystemBack(scaffold);
     }
 
-    return Scaffold(
+    final scaffold = Scaffold(
       body: SafeArea(
         child: Row(
           children: <Widget>[
@@ -181,6 +198,7 @@ class AdminLayout extends ConsumerWidget {
         ),
       ),
     );
+    return handleSystemBack(scaffold);
   }
 }
 

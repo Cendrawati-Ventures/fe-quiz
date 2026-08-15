@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/spacing.dart';
+import '../../../shared/components/app_exit_confirmation.dart';
 import '../state/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -112,7 +113,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authState = ref.watch(authProvider);
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: const Color(0xFFE1E4CF),
       body: SafeArea(
         child: LayoutBuilder(
@@ -207,6 +208,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+    );
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (!didPop) {
+          await confirmExitApp(context);
+        }
+      },
+      child: scaffold,
     );
   }
 
