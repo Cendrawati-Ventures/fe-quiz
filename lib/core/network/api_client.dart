@@ -33,8 +33,7 @@ class ApiClient {
     }
   }
 
-  static const String _localhostBaseUrl = 'https://api-quizqta.cantures.com';
-  static const String _androidEmulatorBaseUrl = 'https://api-quizqta.cantures.com';
+  static const String _defaultBaseUrl = 'https://api-quizqta.nusadex.com';
   static const String _skipAuthTokenKey = 'skipAuthToken';
 
   final Dio _dio;
@@ -76,10 +75,7 @@ class ApiClient {
     if (configuredBaseUrl.isNotEmpty) {
       return configuredBaseUrl;
     }
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return _androidEmulatorBaseUrl;
-    }
-    return _localhostBaseUrl;
+    return _defaultBaseUrl;
   }
 
   void _setupInterceptors() {

@@ -22,6 +22,7 @@ class StudentExamPrecheckScreen extends ConsumerStatefulWidget {
 class _StudentExamPrecheckScreenState
     extends ConsumerState<StudentExamPrecheckScreen> {
   String? _lastEnsuredAttemptId;
+  String? _disclosureAcceptedAttemptId;
   String? _lastErrorShown;
   bool _isPreparing = false;
 
@@ -92,6 +93,71 @@ class _StudentExamPrecheckScreenState
               ),
             ],
           ),
+        ),
+      );
+    }
+
+    final hasAcceptedDisclosure =
+        _disclosureAcceptedAttemptId == config.sessionId;
+    if (!hasAcceptedDisclosure) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Izin Monitoring Ujian'),
+          automaticallyImplyLeading: false,
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          children: <Widget>[
+            const _MonitoringDisclosureCard(),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: TextButton(
+                    onPressed: _isPreparing
+                        ? null
+                        : () async {
+                            final discardError =
+                                await notifier.discardAttemptBeforeStart();
+                            if (discardError != null) {
+                              if (!context.mounted) {
+                                return;
+                              }
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(discardError)),
+                              );
+                              return;
+                            }
+                            await monitoringSession.stop(markFinished: false);
+                            if (!context.mounted) {
+                              return;
+                            }
+                            context.go('/exam');
+                          },
+                    child: const Text('Batal'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  flex: 2,
+                  child: FilledButton.icon(
+                    onPressed: _isPreparing
+                        ? null
+                        : () {
+                            setState(() {
+                              _disclosureAcceptedAttemptId = config.sessionId;
+                            });
+                          },
+                    icon: const Icon(Icons.verified_user_outlined),
+                    label: const Text(
+                      'Setuju & Izinkan Kamera/Mikrofon',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       );
     }
@@ -265,6 +331,97 @@ class _StudentExamPrecheckScreenState
       case AgoraServiceConnectionState.failed:
         return 'Gagal';
     }
+  }
+}
+
+class _MonitoringDisclosureCard extends StatelessWidget {
+  const _MonitoringDisclosureCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(Icons.camera_alt_outlined, color: colorScheme.primary),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'Penggunaan kamera, mikrofon, dan data monitoring',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            const Text(
+              'Jika Anda menyetujui dan melanjutkan, selama sesi ujian aplikasi akan:',
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const _DisclosureItem(
+              text:
+                  'mengakses kamera dan mengirim video secara real-time kepada pengawas;',
+            ),
+            const _DisclosureItem(
+              text:
+                  'mengakses mikrofon, mengirim audio secara real-time, dan merekam potongan audio untuk evaluasi indikasi pelanggaran;',
+            ),
+            const _DisclosureItem(
+              text:
+                  'mengirim status perangkat, koneksi, dan kejadian proctoring ke layanan Quiz QTA, Firebase, dan Agora.',
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const Text(
+              'Data tersebut digunakan untuk memverifikasi peserta, memungkinkan pengawasan, dan menjaga integritas ujian. Akses kamera dan mikrofon hanya digunakan saat monitoring ujian berlangsung.',
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Anda dapat memilih Batal. Ujian yang mewajibkan monitoring tidak dapat dilanjutkan tanpa izin kamera dan mikrofon. Informasi selengkapnya tersedia pada Kebijakan Privasi Quiz QTA.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DisclosureItem extends StatelessWidget {
+  const _DisclosureItem({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Padding(
+            padding: EdgeInsets.only(top: 7),
+            child: Icon(Icons.circle, size: 6),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
   }
 }
 
