@@ -32,6 +32,7 @@ class ExamScreen extends ConsumerStatefulWidget {
 }
 
 class _ExamScreenState extends ConsumerState<ExamScreen> {
+  // ponytail: music is disabled; restore its asset in pubspec.yaml before enabling it.
   static const bool _backgroundMusicEnabled = false;
   static const String _backgroundMusicAsset = 'audio/default-music.wav';
   static const double _backgroundMusicVolume = 0.28;

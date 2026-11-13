@@ -1,7 +1,7 @@
 name: online_exam_system
 description: Mobile Online Exam System frontend.
 publish_to: "none"
-version: 1.0.3+4
+version: 1.0.3+5
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
@@ -43,7 +43,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/audio/default-music.wav
     - assets/images/
 
 flutter_launcher_icons:
