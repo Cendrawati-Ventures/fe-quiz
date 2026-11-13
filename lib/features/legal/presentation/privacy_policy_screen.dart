@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
 
-  static const String _lastUpdated = '30 April 2026';
+  static const String _lastUpdated = '13 November 2026';
   static const String _contactEmail = 'rifkirusdisatmaputra@gmail.com';
 
   @override
@@ -21,7 +21,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                'Kebijakan Privasi Quiz QTA',
+                'Kebijakan Privasi Quiz Bali Q_TA',
                 style: textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -34,6 +34,13 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              _buildSection(
+                context,
+                title: 'Pengelola aplikasi',
+                body: 'Quiz Bali Q_TA (com.nusadex.quizqta) diterbitkan di '
+                    'Google Play oleh Nusadex dan dioperasikan oleh '
+                    'RIFKI RUSDI SATMA PUTRA.',
+              ),
               _buildSection(
                 context,
                 title: 'Data yang dikumpulkan',
