@@ -69,3 +69,5 @@ ios/Runner/GeneratedPluginRegistrant.m
 ios/Pods/
 ios/Podfile.lock
 ios_backup_*/
+
+.commandcode/
