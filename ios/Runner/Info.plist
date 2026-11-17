@@ -28,8 +28,12 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Kamera digunakan untuk verifikasi peserta dan pemantauan selama ujian berlangsung.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Lokasi digunakan untuk verifikasi keberadaan peserta saat mengerjakan ujian.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Mikrofon digunakan untuk pemantauan audio selama ujian berlangsung.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Galeri foto digunakan untuk memilih gambar soal pada pengelolaan bank soal ujian.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
