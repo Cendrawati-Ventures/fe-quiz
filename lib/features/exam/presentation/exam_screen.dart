@@ -257,6 +257,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
                             );
                             return OptionItem(
                               option: option.label,
+                              imageData: option.imageData,
                               selected: selected,
                               multiSelect: isMulti,
                               onTap: () {
@@ -384,6 +385,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
                   );
                   return OptionItem(
                     option: option.label,
+                    imageData: option.imageData,
                     selected: selected,
                     multiSelect: isMulti,
                     onTap: () {
@@ -928,7 +930,13 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         if (entry is Map<String, dynamic>) {
           final value = (entry['value'] ?? entry['id'] ?? '$i').toString();
           final label = (entry['label'] ?? entry['text'] ?? value).toString();
-          result.add(_OptionView(value: value, label: label));
+          result.add(
+            _OptionView(
+              value: value,
+              label: label,
+              imageData: entry['imageData'] as String?,
+            ),
+          );
         } else {
           final value = entry.toString();
           result.add(_OptionView(value: value, label: value));
@@ -942,7 +950,15 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         final label = value is Map<String, dynamic>
             ? (value['label'] ?? value['text'] ?? key).toString()
             : value.toString();
-        result.add(_OptionView(value: key, label: label));
+        result.add(
+          _OptionView(
+            value: key,
+            label: label,
+            imageData: value is Map<String, dynamic>
+                ? value['imageData'] as String?
+                : null,
+          ),
+        );
       });
       return result;
     }
@@ -952,10 +968,15 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 }
 
 class _OptionView {
-  const _OptionView({required this.value, required this.label});
+  const _OptionView({
+    required this.value,
+    required this.label,
+    this.imageData,
+  });
 
   final String value;
   final String label;
+  final String? imageData;
 }
 
 class _CountdownPanel extends StatelessWidget {

@@ -35,6 +35,7 @@ class StudentMonitoringSession extends ChangeNotifier {
   bool get isStarting => _controller.isStarting;
   bool get isFinishing => _controller.isFinishing;
   String? get errorMessage => _controller.errorMessage;
+  String? get startupMessage => _controller.startupMessage;
 
   Future<void> ensureStarted(StudentExamSessionConfig config) async {
     if (_isDisposed) {

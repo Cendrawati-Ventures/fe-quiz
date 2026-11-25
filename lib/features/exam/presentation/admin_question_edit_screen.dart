@@ -37,7 +37,9 @@ class _AdminQuestionEditScreenState
   final TextEditingController _groupParentController = TextEditingController();
 
   late final List<TextEditingController> _optionControllers;
-  final List<_GroupQuestionEditorItem> _groupItems = <_GroupQuestionEditorItem>[];
+  late final List<String?> _optionImageData;
+  final List<_GroupQuestionEditorItem> _groupItems =
+      <_GroupQuestionEditorItem>[];
 
   QuestionType _selectedType = QuestionType.single;
   int? _singleCorrectAnswerIndex;
@@ -51,6 +53,11 @@ class _AdminQuestionEditScreenState
     _optionControllers = List<TextEditingController>.generate(
       adminDefaultOptionValues.length,
       (_) => TextEditingController(),
+    );
+    _optionImageData = List<String?>.filled(
+      adminDefaultOptionValues.length,
+      null,
+      growable: false,
     );
   }
 
@@ -91,10 +98,8 @@ class _AdminQuestionEditScreenState
           _indexOfOptionValue(selected.isNotEmpty ? selected.first : 'A');
     } else if (_selectedType == QuestionType.multi) {
       final selected = parseAnswerValueList(question.correctAnswer);
-      final indexes = selected
-          .map(_indexOfOptionValue)
-          .whereType<int>()
-          .toSet();
+      final indexes =
+          selected.map(_indexOfOptionValue).whereType<int>().toSet();
       _multiCorrectAnswerIndexes = indexes.isEmpty ? <int>{0} : indexes;
     } else {
       _initGroupEditor(
@@ -112,13 +117,15 @@ class _AdminQuestionEditScreenState
 
   void _setOptionControllersFromRaw(Object? rawOptions) {
     final options = parseAdminChoiceOptions(rawOptions);
-    final byValue = <String, String>{
-      for (final option in options) option.value.toUpperCase(): option.label,
+    final byValue = <String, AdminQuestionOption>{
+      for (final option in options) option.value.toUpperCase(): option,
     };
 
     for (var index = 0; index < adminDefaultOptionValues.length; index += 1) {
       final value = adminDefaultOptionValues[index];
-      _optionControllers[index].text = byValue[value] ?? 'Opsi $value';
+      final option = byValue[value];
+      _optionControllers[index].text = option?.label ?? 'Opsi $value';
+      _optionImageData[index] = option?.imageData;
     }
   }
 
@@ -128,9 +135,8 @@ class _AdminQuestionEditScreenState
   }) {
     _disposeGroupItems();
 
-    final optionsMap = rawOptions is Map<String, dynamic>
-        ? rawOptions
-        : <String, dynamic>{};
+    final optionsMap =
+        rawOptions is Map<String, dynamic> ? rawOptions : <String, dynamic>{};
     final rawSubQuestions = _extractRawSubQuestions(rawOptions);
     final correctAnswerMap = rawCorrectAnswer is Map<String, dynamic>
         ? rawCorrectAnswer
@@ -150,10 +156,8 @@ class _AdminQuestionEditScreenState
       final singleIndex = selectedValues.isNotEmpty
           ? _indexOfOptionValue(selectedValues.first)
           : 0;
-      final multiIndexes = selectedValues
-          .map(_indexOfOptionValue)
-          .whereType<int>()
-          .toSet();
+      final multiIndexes =
+          selectedValues.map(_indexOfOptionValue).whereType<int>().toSet();
 
       _groupItems.add(
         _GroupQuestionEditorItem(
@@ -164,8 +168,7 @@ class _AdminQuestionEditScreenState
           optionControllers: _buildOptionControllers(options),
           type: subType,
           singleCorrectIndex: singleIndex ?? 0,
-          multiCorrectIndexes:
-              multiIndexes.isEmpty ? <int>{0} : multiIndexes,
+          multiCorrectIndexes: multiIndexes.isEmpty ? <int>{0} : multiIndexes,
         ),
       );
     }
@@ -184,12 +187,11 @@ class _AdminQuestionEditScreenState
       return <Map<String, dynamic>>[];
     }
 
-    final dynamic candidate =
-        rawOptions['subQuestions'] ??
-            rawOptions['sub_questions'] ??
-            rawOptions['subquestions'] ??
-            rawOptions['questions'] ??
-            rawOptions['items'];
+    final dynamic candidate = rawOptions['subQuestions'] ??
+        rawOptions['sub_questions'] ??
+        rawOptions['subquestions'] ??
+        rawOptions['questions'] ??
+        rawOptions['items'];
 
     if (candidate is List<dynamic>) {
       return candidate.whereType<Map<String, dynamic>>().toList();
@@ -199,11 +201,10 @@ class _AdminQuestionEditScreenState
   }
 
   String _extractGroupParentText(Map<String, dynamic> optionsMap) {
-    final dynamic candidate =
-        optionsMap['parentText'] ??
-            optionsMap['parent'] ??
-            optionsMap['context'] ??
-            optionsMap['stem'];
+    final dynamic candidate = optionsMap['parentText'] ??
+        optionsMap['parent'] ??
+        optionsMap['context'] ??
+        optionsMap['stem'];
     return candidate is String ? candidate.trim() : '';
   }
 
@@ -279,12 +280,14 @@ class _AdminQuestionEditScreenState
 
     if (_selectedType == QuestionType.multi &&
         _multiCorrectAnswerIndexes.isEmpty) {
-      AppSnackBar.error(context, 'Pilih minimal satu jawaban benar untuk tipe multi.');
+      AppSnackBar.error(
+          context, 'Pilih minimal satu jawaban benar untuk tipe multi.');
       return;
     }
 
     if (_selectedType == QuestionType.group && _groupItems.isEmpty) {
-      AppSnackBar.error(context, 'Tambahkan minimal satu sub-soal untuk tipe group.');
+      AppSnackBar.error(
+          context, 'Tambahkan minimal satu sub-soal untuk tipe group.');
       return;
     }
 
@@ -303,7 +306,8 @@ class _AdminQuestionEditScreenState
           return;
         }
 
-        if (item.type == QuestionType.single && item.singleCorrectIndex == null) {
+        if (item.type == QuestionType.single &&
+            item.singleCorrectIndex == null) {
           AppSnackBar.error(
             context,
             'Pilih jawaban benar untuk sub-soal "${item.promptController.text.trim()}".',
@@ -311,7 +315,8 @@ class _AdminQuestionEditScreenState
           return;
         }
 
-        if (item.type == QuestionType.multi && item.multiCorrectIndexes.isEmpty) {
+        if (item.type == QuestionType.multi &&
+            item.multiCorrectIndexes.isEmpty) {
           AppSnackBar.error(
             context,
             'Pilih minimal satu jawaban benar untuk sub-soal "${item.promptController.text.trim()}".',
@@ -355,7 +360,10 @@ class _AdminQuestionEditScreenState
     final weight = int.parse(_weightController.text.trim());
 
     if (_selectedType == QuestionType.single) {
-      final options = _buildChoiceOptionJson(_optionControllers);
+      final options = _buildChoiceOptionJson(
+        _optionControllers,
+        imageData: _optionImageData,
+      );
       final correctAnswer =
           adminDefaultOptionValues[_singleCorrectAnswerIndex ?? 0];
       return _QuestionPayload(
@@ -369,7 +377,10 @@ class _AdminQuestionEditScreenState
     }
 
     if (_selectedType == QuestionType.multi) {
-      final options = _buildChoiceOptionJson(_optionControllers);
+      final options = _buildChoiceOptionJson(
+        _optionControllers,
+        imageData: _optionImageData,
+      );
       final correctAnswer = _multiCorrectAnswerIndexes
           .map((index) => adminDefaultOptionValues[index])
           .toList()
@@ -389,7 +400,8 @@ class _AdminQuestionEditScreenState
 
     for (var index = 0; index < _groupItems.length; index += 1) {
       final item = _groupItems[index];
-      final subQuestionId = item.id.trim().isEmpty ? 'item-${index + 1}' : item.id.trim();
+      final subQuestionId =
+          item.id.trim().isEmpty ? 'item-${index + 1}' : item.id.trim();
       final optionJson = _buildChoiceOptionJson(item.optionControllers);
 
       subQuestions.add(
@@ -430,13 +442,16 @@ class _AdminQuestionEditScreenState
   }
 
   List<Map<String, dynamic>> _buildChoiceOptionJson(
-    List<TextEditingController> controllers,
-  ) {
+    List<TextEditingController> controllers, {
+    List<String?>? imageData,
+  }) {
     return List<Map<String, dynamic>>.generate(
       adminDefaultOptionValues.length,
       (index) => <String, dynamic>{
         'value': adminDefaultOptionValues[index],
         'label': controllers[index].text.trim(),
+        if (imageData != null && imageData[index]?.isNotEmpty == true)
+          'imageData': imageData[index],
       },
     );
   }
@@ -449,6 +464,35 @@ class _AdminQuestionEditScreenState
   }
 
   Future<void> _pickImage() async {
+    final imageData = await _selectImageData(
+      maxBytes: 2 * 1024 * 1024,
+      maxSizeLabel: '2MB',
+    );
+    if (imageData == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _imageData = imageData;
+    });
+  }
+
+  Future<void> _pickOptionImage(int index) async {
+    final imageData = await _selectImageData(
+      maxBytes: 512 * 1024,
+      maxSizeLabel: '512KB',
+    );
+    if (imageData == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _optionImageData[index] = imageData;
+    });
+  }
+
+  Future<String?> _selectImageData({
+    required int maxBytes,
+    required String maxSizeLabel,
+  }) async {
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.image,
       withData: true,
@@ -456,31 +500,28 @@ class _AdminQuestionEditScreenState
     );
 
     if (!mounted || picked == null || picked.files.isEmpty) {
-      return;
+      return null;
     }
 
     final file = picked.files.first;
     final bytes = file.bytes;
     if (bytes == null || bytes.isEmpty) {
       AppSnackBar.error(context, 'Gagal membaca file gambar.');
-      return;
+      return null;
     }
 
-    if (bytes.length > 2 * 1024 * 1024) {
-      AppSnackBar.error(context, 'Ukuran gambar maksimal 2MB.');
-      return;
+    if (bytes.length > maxBytes) {
+      AppSnackBar.error(context, 'Ukuran gambar maksimal $maxSizeLabel.');
+      return null;
     }
 
     final mime = _guessImageMimeType(file.name);
     if (mime == null) {
       AppSnackBar.error(context, 'Format gambar tidak didukung.');
-      return;
+      return null;
     }
 
-    final imageData = 'data:$mime;base64,${base64Encode(bytes)}';
-    setState(() {
-      _imageData = imageData;
-    });
+    return 'data:$mime;base64,${base64Encode(bytes)}';
   }
 
   String? _guessImageMimeType(String? fileName) {
@@ -509,7 +550,8 @@ class _AdminQuestionEditScreenState
       return null;
     }
 
-    final match = RegExp(r'^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$').firstMatch(value);
+    final match =
+        RegExp(r'^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$').firstMatch(value);
     if (match == null) {
       return null;
     }
@@ -619,8 +661,7 @@ class _AdminQuestionEditScreenState
               children: <Widget>[
                 AppCard(
                   title: 'Editor Soal',
-                  subtitle:
-                      'Dukung 3 varian: PGS, PGK-MCMA, dan PGK-Kategori.',
+                  subtitle: 'Dukung 3 varian: PGS, PGK-MCMA, dan PGK-Kategori.',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
@@ -839,13 +880,7 @@ class _AdminQuestionEditScreenState
                     children: <Widget>[
                       Radio<int>(value: index),
                       Expanded(
-                        child: TextFormField(
-                          controller: _optionControllers[index],
-                          decoration: InputDecoration(
-                            labelText: 'Opsi ${adminDefaultOptionValues[index]}',
-                          ),
-                          validator: _validateOptionText,
-                        ),
+                        child: _buildChoiceOptionEditor(index),
                       ),
                     ],
                   ),
@@ -894,17 +929,67 @@ class _AdminQuestionEditScreenState
                   },
                 ),
                 Expanded(
-                  child: TextFormField(
-                    controller: _optionControllers[index],
-                    decoration: InputDecoration(
-                      labelText: 'Opsi ${adminDefaultOptionValues[index]}',
-                    ),
-                    validator: _validateOptionText,
-                  ),
+                  child: _buildChoiceOptionEditor(index),
                 ),
               ],
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _buildChoiceOptionEditor(int index) {
+    final imageBytes = _decodeImageData(_optionImageData[index]);
+    final optionValue = adminDefaultOptionValues[index];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        TextFormField(
+          controller: _optionControllers[index],
+          decoration: InputDecoration(labelText: 'Opsi $optionValue'),
+          validator: _validateOptionText,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        if (imageBytes != null)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.memory(
+              imageBytes,
+              height: 120,
+              fit: BoxFit.contain,
+            ),
+          ),
+        const SizedBox(height: AppSpacing.xs),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _pickOptionImage(index),
+                icon: const Icon(Icons.image_outlined),
+                label: Text(
+                  imageBytes == null ? 'Tambah Gambar' : 'Ganti Gambar',
+                ),
+              ),
+            ),
+            if (imageBytes != null) ...<Widget>[
+              const SizedBox(width: AppSpacing.xs),
+              IconButton(
+                onPressed: () {
+                  setState(() {
+                    _optionImageData[index] = null;
+                  });
+                },
+                tooltip: 'Hapus gambar opsi $optionValue',
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
+          ],
+        ),
+        Text(
+          'Gambar jawaban opsional, maksimal 512KB.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
       ],
     );
   }
@@ -1008,10 +1093,9 @@ class _AdminQuestionEditScreenState
                     item.singleCorrectIndex ??= 0;
                   } else {
                     item.singleCorrectIndex = 0;
-                    item.multiCorrectIndexes =
-                        item.multiCorrectIndexes.isEmpty
-                            ? <int>{0}
-                            : item.multiCorrectIndexes;
+                    item.multiCorrectIndexes = item.multiCorrectIndexes.isEmpty
+                        ? <int>{0}
+                        : item.multiCorrectIndexes;
                   }
                 });
               },
@@ -1044,7 +1128,8 @@ class _AdminQuestionEditScreenState
                         value: item.multiCorrectIndexes.contains(optionIndex),
                         onChanged: (_) {
                           setState(() {
-                            if (item.multiCorrectIndexes.contains(optionIndex)) {
+                            if (item.multiCorrectIndexes
+                                .contains(optionIndex)) {
                               item.multiCorrectIndexes.remove(optionIndex);
                             } else {
                               item.multiCorrectIndexes.add(optionIndex);

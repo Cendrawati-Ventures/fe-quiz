@@ -273,15 +273,18 @@ class AdminQuestionOption {
   const AdminQuestionOption({
     required this.value,
     required this.label,
+    this.imageData,
   });
 
   final String value;
   final String label;
+  final String? imageData;
 
   factory AdminQuestionOption.fromJson(Map<String, dynamic> json) {
     return AdminQuestionOption(
       value: (json['value'] as String? ?? '').trim(),
       label: (json['label'] as String? ?? '').trim(),
+      imageData: (json['imageData'] as String?)?.trim(),
     );
   }
 
@@ -289,6 +292,7 @@ class AdminQuestionOption {
     return <String, dynamic>{
       'value': value,
       'label': label,
+      if (imageData != null && imageData!.isNotEmpty) 'imageData': imageData,
     };
   }
 }
@@ -331,11 +335,21 @@ List<AdminQuestionOption> parseAdminChoiceOptions(Object? raw) {
   } else if (raw is Map<String, dynamic>) {
     raw.forEach((key, value) {
       final optionValue = key.trim();
-      final label = value?.toString().trim() ?? '';
+      final label = value is Map<String, dynamic>
+          ? (value['label'] ?? value['text'])?.toString().trim() ?? ''
+          : value?.toString().trim() ?? '';
       if (optionValue.isEmpty || label.isEmpty) {
         return;
       }
-      result.add(AdminQuestionOption(value: optionValue, label: label));
+      result.add(
+        AdminQuestionOption(
+          value: optionValue,
+          label: label,
+          imageData: value is Map<String, dynamic>
+              ? (value['imageData'] as String?)?.trim()
+              : null,
+        ),
+      );
     });
   }
 

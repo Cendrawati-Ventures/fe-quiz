@@ -168,8 +168,6 @@ class _StudentExamPrecheckScreenState
       monitoringSession: monitoringSession,
     );
 
-    final connectionState = monitoringSession.controller.agoraConnectionState;
-    final currentConnection = connectionState.value;
     final errorMessage = monitoringSession.errorMessage;
     if (errorMessage != null && errorMessage != _lastErrorShown) {
       _lastErrorShown = errorMessage;
@@ -187,8 +185,12 @@ class _StudentExamPrecheckScreenState
       animation: monitoringSession,
       builder: (context, _) {
         final engine = monitoringSession.controller.agoraEngine;
+        final currentConnection =
+            monitoringSession.controller.agoraConnectionState.value;
         final isReady = monitoringSession.isReady;
         final isStarting = monitoringSession.isStarting || _isPreparing;
+        final startupMessage = monitoringSession.startupMessage;
+        final visibleError = monitoringSession.errorMessage;
 
         return Scaffold(
           appBar: AppBar(
@@ -219,7 +221,9 @@ class _StudentExamPrecheckScreenState
                 title: 'Kamera & Mikrofon',
                 value: isReady
                     ? 'Aktif dan siap dipakai.'
-                    : 'Belum siap, sedang memulai perangkat.',
+                    : visibleError ??
+                        startupMessage ??
+                        'Belum siap. Tekan Cek Ulang untuk mencoba lagi.',
                 ok: isReady,
               ),
               const SizedBox(height: AppSpacing.md),

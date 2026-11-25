@@ -37,6 +37,7 @@ class AgoraService {
   String? _joinToken;
   bool _isInitialized = false;
   bool _isJoined = false;
+  Completer<void>? _joinCompleter;
 
   RtcEngine? get engine => _engine;
   String? get channelName => _channelName;
@@ -63,12 +64,20 @@ class AgoraService {
 
     try {
       final engine = createAgoraRtcEngine();
-      await engine.initialize(
-        RtcEngineContext(
-          appId: trimmedAppId,
-          channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
-        ),
-      );
+      await engine
+          .initialize(
+            RtcEngineContext(
+              appId: trimmedAppId,
+              channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
+            ),
+          )
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw const ServiceException(
+              'Persiapan kamera terlalu lama. Tutup aplikasi lain yang memakai kamera lalu coba lagi.',
+              code: 'agora.initialize_timeout',
+            ),
+          );
       try {
         await engine.enableWebSdkInteroperability(true);
       } catch (_) {
@@ -109,6 +118,7 @@ class AgoraService {
     bool autoSubscribeVideo = true,
     bool requestPermissions = true,
     bool startPreview = true,
+    ValueChanged<String>? onProgress,
   }) async {
     final trimmedChannel = channelName.trim();
     if (trimmedChannel.isEmpty) {
@@ -145,6 +155,7 @@ class AgoraService {
       }
 
       if (requestPermissions) {
+        onProgress?.call('Meminta izin kamera dan mikrofon...');
         await _ensurePermissions();
       }
 
@@ -152,8 +163,21 @@ class AgoraService {
         role: role,
       );
       if (startPreview) {
-        await engine.startPreview();
+        onProgress?.call('Menyalakan kamera dan mikrofon...');
+        await engine.startPreview().timeout(
+              const Duration(seconds: 10),
+              onTimeout: () => throw const ServiceException(
+                'Kamera tidak merespons. Tutup aplikasi kamera lain lalu tekan Cek Ulang.',
+                code: 'agora.preview_timeout',
+              ),
+            );
       }
+      onProgress?.call('Menghubungkan ke ruang pengawas...');
+      final joinCompleter = Completer<void>();
+      _joinCompleter = joinCompleter;
+      _channelName = trimmedChannel;
+      _localUid = uid;
+      _joinToken = normalizedToken;
       await engine.joinChannel(
         token: normalizedToken ?? '',
         channelId: trimmedChannel,
@@ -167,14 +191,23 @@ class AgoraService {
           channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
         ),
       );
-
-      _channelName = trimmedChannel;
-      _localUid = uid;
-      _joinToken = normalizedToken;
-      _isJoined = true;
-      connectionState.value = AgoraServiceConnectionState.connected;
+      await joinCompleter.future.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw const ServiceException(
+          'Koneksi monitoring terlalu lama. Periksa internet lalu coba lagi.',
+          code: 'agora.join_timeout',
+        ),
+      );
     } catch (error, stackTrace) {
+      _joinCompleter = null;
+      _isJoined = false;
+      _channelName = null;
+      _localUid = null;
+      _joinToken = null;
       connectionState.value = AgoraServiceConnectionState.failed;
+      if (error is ServiceException) {
+        rethrow;
+      }
       throw ServiceException(
         'Gagal join ke channel Agora.',
         code: 'agora.join_failed',
@@ -207,6 +240,7 @@ class AgoraService {
       _channelName = null;
       _localUid = null;
       _joinToken = null;
+      _joinCompleter = null;
       remoteUids.value = <int>{};
       connectionState.value = AgoraServiceConnectionState.disconnected;
     }
@@ -344,6 +378,7 @@ class AgoraService {
       _channelName = null;
       _localUid = null;
       _joinToken = null;
+      _joinCompleter = null;
       remoteUids.value = <int>{};
       connectionState.value = AgoraServiceConnectionState.idle;
       return;
@@ -375,6 +410,7 @@ class AgoraService {
     _channelName = null;
     _localUid = null;
     _joinToken = null;
+    _joinCompleter = null;
     remoteUids.value = <int>{};
     connectionState.value = AgoraServiceConnectionState.idle;
   }
@@ -383,15 +419,24 @@ class AgoraService {
     return RtcEngineEventHandler(
       onError: (error, message) {
         connectionState.value = AgoraServiceConnectionState.failed;
-        _emitError(
-          ServiceException(
-            'Agora error: $message',
-            code: 'agora.runtime_error_$error',
-          ),
+        final exception = ServiceException(
+          'Agora error: $message',
+          code: 'agora.runtime_error_$error',
         );
+        final completer = _joinCompleter;
+        if (completer != null && !completer.isCompleted) {
+          completer.completeError(exception);
+        }
+        _emitError(exception);
       },
       onJoinChannelSuccess: (_, __) {
+        _isJoined = true;
         connectionState.value = AgoraServiceConnectionState.connected;
+        final completer = _joinCompleter;
+        if (completer != null && !completer.isCompleted) {
+          completer.complete();
+        }
+        _joinCompleter = null;
       },
       onLeaveChannel: (_, __) {
         _isJoined = false;
@@ -414,6 +459,15 @@ class AgoraService {
             break;
           case ConnectionStateType.connectionStateFailed:
             connectionState.value = AgoraServiceConnectionState.failed;
+            final completer = _joinCompleter;
+            if (completer != null && !completer.isCompleted) {
+              completer.completeError(
+                const ServiceException(
+                  'Koneksi monitoring gagal. Periksa internet lalu coba lagi.',
+                  code: 'agora.connection_failed',
+                ),
+              );
+            }
             break;
         }
       },

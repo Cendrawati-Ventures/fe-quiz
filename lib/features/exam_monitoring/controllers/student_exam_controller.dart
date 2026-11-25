@@ -33,6 +33,7 @@ class StudentExamController extends ChangeNotifier {
   bool _isReady = false;
   bool _isFinished = false;
   String? _errorMessage;
+  String? _startupMessage;
   ExamStudentStatus _status = ExamStudentStatus.offline;
   int _violations = 0;
 
@@ -41,6 +42,7 @@ class StudentExamController extends ChangeNotifier {
   bool get isReady => _isReady;
   bool get isFinished => _isFinished;
   String? get errorMessage => _errorMessage;
+  String? get startupMessage => _startupMessage;
   ExamStudentStatus get status => _status;
   int get violations => _violations;
   String? get firebasePath => _realtimeStatusService.statusPath;
@@ -57,6 +59,7 @@ class StudentExamController extends ChangeNotifier {
 
     _isStarting = true;
     _errorMessage = null;
+    _setStartupMessage('Menyiapkan layanan kamera...');
     _status = ExamStudentStatus.offline;
     _violations = config.initialViolations;
     _safeNotify();
@@ -64,34 +67,15 @@ class StudentExamController extends ChangeNotifier {
     await _attachServiceErrorListeners();
 
     try {
-      var realtimeReady = false;
-      try {
-        await _realtimeStatusService.initialize(
-          sessionId: config.sessionId,
-          studentId: config.studentId,
-          studentName: config.studentName,
-          databaseUrl: config.firebaseDatabaseUrl,
-          device: config.device,
-          initialViolations: config.initialViolations,
-        );
-        await _realtimeStatusService.setStatus(ExamStudentStatus.active);
-        realtimeReady = true;
-      } on ServiceException catch (error) {
-        if (!_canRunWithoutRealtime(error)) {
-          rethrow;
-        }
-        _setError(
-          'Monitoring realtime Firebase belum aktif di iOS. Kamera/mikrofon tetap digunakan untuk ujian.',
-        );
-      }
-
       await _agoraService.initialize(appId: config.agoraAppId);
       await _agoraService.joinChannel(
         channelName: config.agoraChannel,
         uid: config.agoraUid,
         token: config.agoraToken,
+        onProgress: _setStartupMessage,
       );
 
+      _setStartupMessage('Mengaktifkan perlindungan ujian...');
       await _antiCheatService.start(
         onLeftApp: _handleLeftApp,
         onActive: _handleResumedActive,
@@ -102,13 +86,16 @@ class StudentExamController extends ChangeNotifier {
       );
 
       _status = ExamStudentStatus.active;
-      _violations = realtimeReady ? _realtimeStatusService.violations : 0;
       _isReady = true;
       _isFinished = false;
+      _setStartupMessage(null);
+      unawaited(_startRealtimeMonitoring(config));
     } on ServiceException catch (error) {
+      _setStartupMessage(error.message);
       _setError(error.message);
       await _safeRollbackStartup();
     } catch (error, stackTrace) {
+      _setStartupMessage('Gagal memulai kamera dan mikrofon.');
       _setError('Gagal memulai sesi ujian.');
       await _safeRollbackStartup(
         cause: error,
@@ -189,6 +176,7 @@ class StudentExamController extends ChangeNotifier {
   Future<void> close() async {
     final alreadyFinished = _isFinished;
     _isReady = false;
+    _startupMessage = null;
 
     await _antiCheatService.stop();
 
@@ -267,6 +255,40 @@ class StudentExamController extends ChangeNotifier {
     }
   }
 
+  Future<void> _startRealtimeMonitoring(
+    StudentExamSessionConfig config,
+  ) async {
+    try {
+      await _realtimeStatusService.initialize(
+        sessionId: config.sessionId,
+        studentId: config.studentId,
+        studentName: config.studentName,
+        databaseUrl: config.firebaseDatabaseUrl,
+        device: config.device,
+        initialViolations: config.initialViolations,
+      );
+      if (!_isReady) {
+        await _realtimeStatusService.shutdown(markOffline: true);
+        return;
+      }
+      _violations = _realtimeStatusService.violations;
+      _safeNotify();
+    } on ServiceException catch (error) {
+      if (!_isReady) {
+        return;
+      }
+      _setError(
+        'Kamera aktif, tetapi status realtime belum terhubung: ${error.message}',
+      );
+    } catch (_) {
+      if (_isReady) {
+        _setError(
+          'Kamera aktif, tetapi status realtime belum terhubung.',
+        );
+      }
+    }
+  }
+
   Future<void> _attachServiceErrorListeners() async {
     await _detachServiceErrorListeners();
     _agoraErrorSubscription = _agoraService.errors.listen((error) {
@@ -319,15 +341,16 @@ class StudentExamController extends ChangeNotifier {
     _safeNotify();
   }
 
+  void _setStartupMessage(String? message) {
+    _startupMessage = message;
+    _safeNotify();
+  }
+
   void _safeNotify() {
     if (_isDisposed) {
       return;
     }
     notifyListeners();
-  }
-
-  bool _canRunWithoutRealtime(ServiceException error) {
-    return error.code == 'realtime.unsupported_platform';
   }
 
   @override
