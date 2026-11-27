@@ -388,8 +388,8 @@ class _AdminQuestionManagementScreenState
                               final question = _displayedQuestions[index];
                               return Container(
                                 key: ValueKey<String>(question.id),
-                                margin:
-                                    const EdgeInsets.only(bottom: AppSpacing.xs),
+                                margin: const EdgeInsets.only(
+                                    bottom: AppSpacing.xs),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
@@ -615,6 +615,13 @@ class _QuickCreateQuestionDialogState
       );
     }
 
+    if (type == QuestionType.essay) {
+      return const _InitialQuestionPayload(
+        options: <String, dynamic>{},
+        correctAnswer: '',
+      );
+    }
+
     return _InitialQuestionPayload(
       options: <String, dynamic>{
         'parentText': '',
@@ -676,7 +683,8 @@ class _QuickCreateQuestionDialogState
             Expanded(
               child: OutlinedButton(
                 onPressed: _pickImage,
-                child: Text(imageBytes == null ? 'Pilih Gambar' : 'Ganti Gambar'),
+                child:
+                    Text(imageBytes == null ? 'Pilih Gambar' : 'Ganti Gambar'),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -757,7 +765,8 @@ class _QuickCreateQuestionDialogState
       return null;
     }
 
-    final match = RegExp(r'^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$').firstMatch(value);
+    final match =
+        RegExp(r'^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$').firstMatch(value);
     if (match == null) {
       return null;
     }

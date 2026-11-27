@@ -57,7 +57,6 @@ class _AdminQuestionEditScreenState
     _optionImageData = List<String?>.filled(
       adminDefaultOptionValues.length,
       null,
-      growable: false,
     );
   }
 
@@ -101,7 +100,7 @@ class _AdminQuestionEditScreenState
       final indexes =
           selected.map(_indexOfOptionValue).whereType<int>().toSet();
       _multiCorrectAnswerIndexes = indexes.isEmpty ? <int>{0} : indexes;
-    } else {
+    } else if (_selectedType == QuestionType.group) {
       _initGroupEditor(
         rawOptions: question.options,
         rawCorrectAnswer: question.correctAnswer,
@@ -117,12 +116,24 @@ class _AdminQuestionEditScreenState
 
   void _setOptionControllersFromRaw(Object? rawOptions) {
     final options = parseAdminChoiceOptions(rawOptions);
+    final optionCount = options.isEmpty
+        ? adminDefaultOptionValues.length
+        : options.length.clamp(2, adminAvailableOptionValues.length).toInt();
     final byValue = <String, AdminQuestionOption>{
       for (final option in options) option.value.toUpperCase(): option,
     };
 
-    for (var index = 0; index < adminDefaultOptionValues.length; index += 1) {
-      final value = adminDefaultOptionValues[index];
+    while (_optionControllers.length < optionCount) {
+      _optionControllers.add(TextEditingController());
+      _optionImageData.add(null);
+    }
+    while (_optionControllers.length > optionCount) {
+      _optionControllers.removeLast().dispose();
+      _optionImageData.removeLast();
+    }
+
+    for (var index = 0; index < optionCount; index += 1) {
+      final value = adminAvailableOptionValues[index];
       final option = byValue[value];
       _optionControllers[index].text = option?.label ?? 'Opsi $value';
       _optionImageData[index] = option?.imageData;
@@ -232,10 +243,13 @@ class _AdminQuestionEditScreenState
       for (final option in options) option.value.toUpperCase(): option.label,
     };
 
+    final optionCount = options.isEmpty
+        ? adminDefaultOptionValues.length
+        : options.length.clamp(2, adminAvailableOptionValues.length).toInt();
     return List<TextEditingController>.generate(
-      adminDefaultOptionValues.length,
+      optionCount,
       (index) {
-        final value = adminDefaultOptionValues[index];
+        final value = adminAvailableOptionValues[index];
         return TextEditingController(text: byValue[value] ?? 'Opsi $value');
       },
     );
@@ -260,7 +274,7 @@ class _AdminQuestionEditScreenState
   }
 
   int? _indexOfOptionValue(String optionValue) {
-    final index = adminDefaultOptionValues.indexOf(optionValue.toUpperCase());
+    final index = adminAvailableOptionValues.indexOf(optionValue.toUpperCase());
     if (index < 0) {
       return null;
     }
@@ -291,7 +305,8 @@ class _AdminQuestionEditScreenState
       return;
     }
 
-    if (_selectedType != QuestionType.group) {
+    if (_selectedType == QuestionType.single ||
+        _selectedType == QuestionType.multi) {
       if (_hasDuplicateOptionLabels(_optionControllers)) {
         AppSnackBar.error(context, 'Setiap opsi jawaban harus berbeda.');
         return;
@@ -365,7 +380,7 @@ class _AdminQuestionEditScreenState
         imageData: _optionImageData,
       );
       final correctAnswer =
-          adminDefaultOptionValues[_singleCorrectAnswerIndex ?? 0];
+          adminAvailableOptionValues[_singleCorrectAnswerIndex ?? 0];
       return _QuestionPayload(
         type: _selectedType,
         text: text,
@@ -382,7 +397,7 @@ class _AdminQuestionEditScreenState
         imageData: _optionImageData,
       );
       final correctAnswer = _multiCorrectAnswerIndexes
-          .map((index) => adminDefaultOptionValues[index])
+          .map((index) => adminAvailableOptionValues[index])
           .toList()
         ..sort((a, b) => a.compareTo(b));
       return _QuestionPayload(
@@ -391,6 +406,17 @@ class _AdminQuestionEditScreenState
         weight: weight,
         options: options,
         correctAnswer: correctAnswer,
+        imageData: _imageData,
+      );
+    }
+
+    if (_selectedType == QuestionType.essay) {
+      return _QuestionPayload(
+        type: _selectedType,
+        text: text,
+        weight: weight,
+        options: const <String, dynamic>{},
+        correctAnswer: '',
         imageData: _imageData,
       );
     }
@@ -415,13 +441,14 @@ class _AdminQuestionEditScreenState
 
       if (item.type == QuestionType.multi) {
         final selected = item.multiCorrectIndexes
-            .map((itemIndex) => adminDefaultOptionValues[itemIndex])
+            .map((itemIndex) => adminAvailableOptionValues[itemIndex])
             .toList()
           ..sort((a, b) => a.compareTo(b));
         correctAnswer[subQuestionId] = selected;
       } else {
         final selectedIndex = item.singleCorrectIndex ?? 0;
-        correctAnswer[subQuestionId] = adminDefaultOptionValues[selectedIndex];
+        correctAnswer[subQuestionId] =
+            adminAvailableOptionValues[selectedIndex];
       }
     }
 
@@ -446,9 +473,9 @@ class _AdminQuestionEditScreenState
     List<String?>? imageData,
   }) {
     return List<Map<String, dynamic>>.generate(
-      adminDefaultOptionValues.length,
+      controllers.length,
       (index) => <String, dynamic>{
-        'value': adminDefaultOptionValues[index],
+        'value': adminAvailableOptionValues[index],
         'label': controllers[index].text.trim(),
         if (imageData != null && imageData[index]?.isNotEmpty == true)
           'imageData': imageData[index],
@@ -461,6 +488,62 @@ class _AdminQuestionEditScreenState
         .map((controller) => controller.text.trim().toLowerCase())
         .toList();
     return labels.toSet().length != labels.length;
+  }
+
+  void _addChoiceOption() {
+    if (_optionControllers.length >= adminAvailableOptionValues.length) {
+      return;
+    }
+    setState(() {
+      final value = adminAvailableOptionValues[_optionControllers.length];
+      _optionControllers.add(TextEditingController(text: 'Opsi $value'));
+      _optionImageData.add(null);
+    });
+  }
+
+  void _removeChoiceOption() {
+    if (_optionControllers.length <= 2) {
+      return;
+    }
+    setState(() {
+      final removedIndex = _optionControllers.length - 1;
+      _optionControllers.removeLast().dispose();
+      _optionImageData.removeLast();
+      if (_singleCorrectAnswerIndex == removedIndex) {
+        _singleCorrectAnswerIndex = 0;
+      }
+      _multiCorrectAnswerIndexes.remove(removedIndex);
+      if (_multiCorrectAnswerIndexes.isEmpty) {
+        _multiCorrectAnswerIndexes.add(0);
+      }
+    });
+  }
+
+  void _addGroupChoiceOption(_GroupQuestionEditorItem item) {
+    if (item.optionControllers.length >= adminAvailableOptionValues.length) {
+      return;
+    }
+    setState(() {
+      final value = adminAvailableOptionValues[item.optionControllers.length];
+      item.optionControllers.add(TextEditingController(text: 'Opsi $value'));
+    });
+  }
+
+  void _removeGroupChoiceOption(_GroupQuestionEditorItem item) {
+    if (item.optionControllers.length <= 2) {
+      return;
+    }
+    setState(() {
+      final removedIndex = item.optionControllers.length - 1;
+      item.optionControllers.removeLast().dispose();
+      if (item.singleCorrectIndex == removedIndex) {
+        item.singleCorrectIndex = 0;
+      }
+      item.multiCorrectIndexes.remove(removedIndex);
+      if (item.multiCorrectIndexes.isEmpty) {
+        item.multiCorrectIndexes.add(0);
+      }
+    });
   }
 
   Future<void> _pickImage() async {
@@ -661,7 +744,7 @@ class _AdminQuestionEditScreenState
               children: <Widget>[
                 AppCard(
                   title: 'Editor Soal',
-                  subtitle: 'Dukung 3 varian: PGS, PGK-MCMA, dan PGK-Kategori.',
+                  subtitle: 'Dukung PGS, PGK-MCMA, PGK-Kategori, dan Esai.',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
@@ -733,8 +816,10 @@ class _AdminQuestionEditScreenState
                         _buildSingleChoiceEditor()
                       else if (_selectedType == QuestionType.multi)
                         _buildMultiChoiceEditor()
-                      else
+                      else if (_selectedType == QuestionType.group)
                         _buildGroupEditor(),
+                      if (_selectedType == QuestionType.essay)
+                        _buildEssayEditorInfo(),
                     ],
                   ),
                 ),
@@ -843,6 +928,22 @@ class _AdminQuestionEditScreenState
     );
   }
 
+  Widget _buildEssayEditorInfo() {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context)
+            .colorScheme
+            .primaryContainer
+            .withValues(alpha: 0.45),
+      ),
+      child: const Text(
+        'Siswa akan mendapat kolom jawaban panjang. Jawaban esai dinilai manual oleh admin setelah ujian dikumpulkan.',
+      ),
+    );
+  }
+
   Widget _buildSingleChoiceEditor() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -866,12 +967,10 @@ class _AdminQuestionEditScreenState
           },
           child: Column(
             children: <Widget>[
-              for (var index = 0;
-                  index < adminDefaultOptionValues.length;
-                  index += 1)
+              for (var index = 0; index < _optionControllers.length; index += 1)
                 Padding(
                   padding: EdgeInsets.only(
-                    bottom: index == adminDefaultOptionValues.length - 1
+                    bottom: index == _optionControllers.length - 1
                         ? 0
                         : AppSpacing.xs,
                   ),
@@ -888,6 +987,8 @@ class _AdminQuestionEditScreenState
             ],
           ),
         ),
+        const SizedBox(height: AppSpacing.sm),
+        _buildChoiceOptionActions(),
       ],
     );
   }
@@ -906,12 +1007,11 @@ class _AdminQuestionEditScreenState
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: AppSpacing.sm),
-        for (var index = 0; index < adminDefaultOptionValues.length; index += 1)
+        for (var index = 0; index < _optionControllers.length; index += 1)
           Padding(
             padding: EdgeInsets.only(
-              bottom: index == adminDefaultOptionValues.length - 1
-                  ? 0
-                  : AppSpacing.xs,
+              bottom:
+                  index == _optionControllers.length - 1 ? 0 : AppSpacing.xs,
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -934,13 +1034,41 @@ class _AdminQuestionEditScreenState
               ],
             ),
           ),
+        const SizedBox(height: AppSpacing.sm),
+        _buildChoiceOptionActions(),
+      ],
+    );
+  }
+
+  Widget _buildChoiceOptionActions() {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed:
+                _optionControllers.length > 2 ? _removeChoiceOption : null,
+            icon: const Icon(Icons.remove),
+            label: const Text('Kurangi Opsi'),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed:
+                _optionControllers.length < adminAvailableOptionValues.length
+                    ? _addChoiceOption
+                    : null,
+            icon: const Icon(Icons.add),
+            label: const Text('Tambah Opsi'),
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildChoiceOptionEditor(int index) {
     final imageBytes = _decodeImageData(_optionImageData[index]);
-    final optionValue = adminDefaultOptionValues[index];
+    final optionValue = adminAvailableOptionValues[index];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1113,11 +1241,11 @@ class _AdminQuestionEditScreenState
             const SizedBox(height: AppSpacing.sm),
             if (isMulti)
               for (var optionIndex = 0;
-                  optionIndex < adminDefaultOptionValues.length;
+                  optionIndex < item.optionControllers.length;
                   optionIndex += 1)
                 Padding(
                   padding: EdgeInsets.only(
-                    bottom: optionIndex == adminDefaultOptionValues.length - 1
+                    bottom: optionIndex == item.optionControllers.length - 1
                         ? 0
                         : AppSpacing.xs,
                   ),
@@ -1142,7 +1270,7 @@ class _AdminQuestionEditScreenState
                           controller: item.optionControllers[optionIndex],
                           decoration: InputDecoration(
                             labelText:
-                                'Opsi ${adminDefaultOptionValues[optionIndex]}',
+                                'Opsi ${adminAvailableOptionValues[optionIndex]}',
                           ),
                           validator: _validateOptionText,
                         ),
@@ -1161,12 +1289,12 @@ class _AdminQuestionEditScreenState
                 child: Column(
                   children: <Widget>[
                     for (var optionIndex = 0;
-                        optionIndex < adminDefaultOptionValues.length;
+                        optionIndex < item.optionControllers.length;
                         optionIndex += 1)
                       Padding(
                         padding: EdgeInsets.only(
                           bottom:
-                              optionIndex == adminDefaultOptionValues.length - 1
+                              optionIndex == item.optionControllers.length - 1
                                   ? 0
                                   : AppSpacing.xs,
                         ),
@@ -1179,7 +1307,7 @@ class _AdminQuestionEditScreenState
                                 controller: item.optionControllers[optionIndex],
                                 decoration: InputDecoration(
                                   labelText:
-                                      'Opsi ${adminDefaultOptionValues[optionIndex]}',
+                                      'Opsi ${adminAvailableOptionValues[optionIndex]}',
                                 ),
                                 validator: _validateOptionText,
                               ),
@@ -1190,6 +1318,31 @@ class _AdminQuestionEditScreenState
                   ],
                 ),
               ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: item.optionControllers.length > 2
+                        ? () => _removeGroupChoiceOption(item)
+                        : null,
+                    icon: const Icon(Icons.remove),
+                    label: const Text('Kurangi Opsi'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: item.optionControllers.length <
+                            adminAvailableOptionValues.length
+                        ? () => _addGroupChoiceOption(item)
+                        : null,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Tambah Opsi'),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

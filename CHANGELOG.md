@@ -1,5 +1,29 @@
 # Release Notes
 
+## Mobile v1.1.3.11 - 2026-11-27
+- Tipe rilis: minor
+- Ringkasan:
+  - Menambahkan soal esai dengan jawaban teks siswa.
+  - Menambahkan status menunggu penilaian dan penilaian manual oleh admin.
+  - Mempertahankan pilihan ganda fleksibel 2 sampai 5 opsi (A sampai E).
+- Dampak user:
+  - Siswa dapat mengerjakan soal esai langsung dari aplikasi.
+  - Admin dapat memberi nilai esai dan melihat hasil setelah penilaian selesai.
+- Kompatibilitas:
+  - Memerlukan backend terbaru dan migrasi database penilaian esai.
+
+## Mobile v1.1.2.10 - 2026-11-26
+- Tipe rilis: minor
+- Ringkasan:
+  - Menambahkan tombol untuk menambah dan mengurangi opsi jawaban pilihan ganda.
+  - Mendukung 2 sampai 5 opsi jawaban (A sampai E).
+  - Menyesuaikan pilihan jawaban benar ketika opsi terakhir dihapus.
+- Dampak user:
+  - Admin dapat membuat soal dengan jumlah pilihan yang sesuai kebutuhan.
+  - Soal lama dengan empat pilihan tetap dapat digunakan tanpa perubahan.
+- Kompatibilitas:
+  - Backend v1.1.2 harus diterapkan agar soal dengan jumlah selain empat opsi dapat disimpan.
+
 ## Mobile v1.1.1.9 - 2026-11-25
 - Tipe rilis: patch
 - Ringkasan:

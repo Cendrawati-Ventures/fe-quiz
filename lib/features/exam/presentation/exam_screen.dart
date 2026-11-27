@@ -239,41 +239,46 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Expanded(
-                  child: isGroupQuestion && groupSubQuestions.isNotEmpty
-                      ? _buildGroupQuestionBody(
+                  child: question.type == QuestionType.essay
+                      ? _buildEssayAnswer(
                           questionId: question.id,
-                          parentText: groupParentText,
-                          subQuestions: groupSubQuestions,
-                          groupAnswer: groupAnswerMap,
+                          answer: answer,
                         )
-                      : ListView.builder(
-                          itemCount: options.length,
-                          itemBuilder: (context, index) {
-                            final option = options[index];
-                            final selected = _isOptionSelected(
-                              answer: answer,
-                              optionValue: option.value,
-                              isMulti: isMulti,
-                            );
-                            return OptionItem(
-                              option: option.label,
-                              imageData: option.imageData,
-                              selected: selected,
-                              multiSelect: isMulti,
-                              onTap: () {
-                                final nextAnswer = _nextAnswerValue(
-                                  previousAnswer: answer,
+                      : isGroupQuestion && groupSubQuestions.isNotEmpty
+                          ? _buildGroupQuestionBody(
+                              questionId: question.id,
+                              parentText: groupParentText,
+                              subQuestions: groupSubQuestions,
+                              groupAnswer: groupAnswerMap,
+                            )
+                          : ListView.builder(
+                              itemCount: options.length,
+                              itemBuilder: (context, index) {
+                                final option = options[index];
+                                final selected = _isOptionSelected(
+                                  answer: answer,
                                   optionValue: option.value,
                                   isMulti: isMulti,
                                 );
-                                notifier.answerQuestion(
-                                  questionId: question.id,
-                                  answer: nextAnswer,
+                                return OptionItem(
+                                  option: option.label,
+                                  imageData: option.imageData,
+                                  selected: selected,
+                                  multiSelect: isMulti,
+                                  onTap: () {
+                                    final nextAnswer = _nextAnswerValue(
+                                      previousAnswer: answer,
+                                      optionValue: option.value,
+                                      isMulti: isMulti,
+                                    );
+                                    notifier.answerQuestion(
+                                      questionId: question.id,
+                                      answer: nextAnswer,
+                                    );
+                                  },
                                 );
                               },
-                            );
-                          },
-                        ),
+                            ),
                 ),
               ],
             ),
@@ -329,6 +334,43 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildEssayAnswer({
+    required String questionId,
+    required Object? answer,
+  }) {
+    return ListView(
+      children: <Widget>[
+        TextFormField(
+          key: ValueKey<String>('essay-$questionId'),
+          initialValue: answer is String ? answer : '',
+          minLines: 7,
+          maxLines: 14,
+          maxLength: 5000,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            labelText: 'Jawaban Esai',
+            hintText: 'Tuliskan jawaban secara lengkap di sini',
+            alignLabelWithHint: true,
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (value) {
+            unawaited(
+              ref.read(examSessionProvider.notifier).answerQuestion(
+                    questionId: questionId,
+                    answer: value,
+                  ),
+            );
+          },
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Jawaban esai akan dinilai manual oleh admin.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
     );
   }
 

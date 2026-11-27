@@ -513,6 +513,21 @@ class ExamService {
     }
   }
 
+  Future<void> gradeEssayAnswer({
+    required String answerId,
+    required num score,
+  }) async {
+    try {
+      await _dio.patch<dynamic>(
+        '/answers/$answerId/grade',
+        data: <String, dynamic>{'score': score},
+        options: _writeOptions(),
+      );
+    } on DioException catch (error) {
+      throw ApiError.fromDioException(error);
+    }
+  }
+
   Future<ProctoringResponse> sendProctoringEvents(
     List<ProctoringEventPayload> events,
   ) async {

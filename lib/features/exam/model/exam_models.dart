@@ -10,7 +10,7 @@ num _readNum(dynamic value) {
   return 0;
 }
 
-enum QuestionType { single, multi, group }
+enum QuestionType { single, multi, group, essay }
 
 QuestionType questionTypeFromString(String value) {
   switch (value) {
@@ -20,6 +20,8 @@ QuestionType questionTypeFromString(String value) {
       return QuestionType.multi;
     case 'group':
       return QuestionType.group;
+    case 'essay':
+      return QuestionType.essay;
     default:
       return QuestionType.single;
   }
@@ -33,6 +35,8 @@ String questionTypeToString(QuestionType value) {
       return 'multi';
     case QuestionType.group:
       return 'group';
+    case QuestionType.essay:
+      return 'essay';
   }
 }
 
@@ -298,6 +302,13 @@ class AdminQuestionOption {
 }
 
 const List<String> adminDefaultOptionValues = <String>['A', 'B', 'C', 'D'];
+const List<String> adminAvailableOptionValues = <String>[
+  'A',
+  'B',
+  'C',
+  'D',
+  'E',
+];
 
 const List<AdminQuestionOption> adminDefaultQuestionOptions =
     <AdminQuestionOption>[
@@ -315,6 +326,8 @@ String adminQuestionTypeLabel(QuestionType value) {
       return 'PGK-MCMA';
     case QuestionType.group:
       return 'PGK-Kategori';
+    case QuestionType.essay:
+      return 'Esai';
   }
 }
 
@@ -861,6 +874,7 @@ class SubmitResponse {
     required this.duration,
     required this.cheatScore,
     required this.riskLevel,
+    required this.gradingStatus,
   });
 
   final String id;
@@ -871,6 +885,7 @@ class SubmitResponse {
   final int duration;
   final int cheatScore;
   final RiskLevel riskLevel;
+  final String gradingStatus;
 
   factory SubmitResponse.fromJson(Map<String, dynamic> json) {
     return SubmitResponse(
@@ -882,6 +897,7 @@ class SubmitResponse {
       duration: json['duration'] as int? ?? 0,
       cheatScore: json['cheatScore'] as int? ?? 0,
       riskLevel: riskLevelFromString(json['riskLevel'] as String? ?? 'safe'),
+      gradingStatus: json['gradingStatus'] as String? ?? 'complete',
     );
   }
 
@@ -902,6 +918,7 @@ class SubmitResponse {
       duration: duration,
       cheatScore: cheatScore,
       riskLevel: riskLevel,
+      gradingStatus: gradingStatus,
       examTitle: null,
       subjectName: null,
       username: null,
@@ -926,6 +943,7 @@ class ResultResponse {
     required this.duration,
     required this.cheatScore,
     required this.riskLevel,
+    required this.gradingStatus,
     required this.examTitle,
     required this.subjectName,
     required this.username,
@@ -947,6 +965,9 @@ class ResultResponse {
   final int duration;
   final int cheatScore;
   final RiskLevel riskLevel;
+  final String gradingStatus;
+
+  bool get isPendingGrading => gradingStatus == 'pending';
   final String? examTitle;
   final String? subjectName;
   final String? username;
@@ -973,6 +994,7 @@ class ResultResponse {
       duration: json['duration'] as int? ?? 0,
       cheatScore: json['cheatScore'] as int? ?? 0,
       riskLevel: riskLevelFromString(json['riskLevel'] as String? ?? 'safe'),
+      gradingStatus: json['gradingStatus'] as String? ?? 'complete',
       examTitle: json['examTitle'] as String?,
       subjectName: json['subjectName'] as String?,
       username: json['username'] as String?,
@@ -1002,6 +1024,7 @@ class ResultResponse {
       'duration': duration,
       'cheatScore': cheatScore,
       'riskLevel': riskLevelToString(riskLevel),
+      'gradingStatus': gradingStatus,
       'examTitle': examTitle,
       'subjectName': subjectName,
       'username': username,
@@ -1073,15 +1096,19 @@ class AttemptAnswer {
 
 class AdminAttemptAnswer {
   const AdminAttemptAnswer({
+    required this.id,
     required this.questionId,
     required this.answer,
     required this.isCorrect,
+    required this.awardedWeight,
     required this.question,
   });
 
+  final String id;
   final String questionId;
   final Object? answer;
   final bool? isCorrect;
+  final num? awardedWeight;
   final AdminQuestion? question;
 
   factory AdminAttemptAnswer.fromJson(Map<String, dynamic> json) {
@@ -1091,11 +1118,15 @@ class AdminAttemptAnswer {
         : null;
     final questionId = (json['questionId'] as String?)?.trim();
     return AdminAttemptAnswer(
+      id: (json['id'] as String? ?? '').trim(),
       questionId: (questionId != null && questionId.isNotEmpty)
           ? questionId
           : (parsedQuestion?.id ?? ''),
       answer: json['answer'],
       isCorrect: json['isCorrect'] as bool?,
+      awardedWeight: json['awardedWeight'] == null
+          ? null
+          : _readNum(json['awardedWeight']),
       question: parsedQuestion,
     );
   }

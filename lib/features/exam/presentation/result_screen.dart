@@ -394,7 +394,9 @@ class _LatestResultCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Nilai: ${latest.result.score}',
+            latest.result.isPendingGrading
+                ? 'Nilai: Menunggu penilaian esai'
+                : 'Nilai: ${latest.result.score}',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: const Color(0xFF3F341F),
                   fontWeight: FontWeight.w700,
@@ -402,7 +404,9 @@ class _LatestResultCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Nilai kamu juga tersimpan di server offline dan dapat dilihat admin.',
+            latest.result.isPendingGrading
+                ? 'Jawaban sudah tersimpan. Nilai akhir tampil setelah admin menilai esai.'
+                : 'Nilai kamu juga tersimpan di server offline dan dapat dilihat admin.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: const Color(0xFF6C624F),
                 ),
@@ -572,8 +576,9 @@ class _HistoryResultTile extends StatelessWidget {
     final summary = _proctoringSummaryText(result.proctoringReport);
     return AppCard(
       title: result.examTitle ?? 'Hasil Ujian',
-      subtitle:
-          '${result.subjectName ?? '-'}\nNilai: ${result.score} | Benar: ${result.correct} | Salah: ${result.wrong} | Total: $total\nPengawasan: $summary',
+      subtitle: result.isPendingGrading
+          ? '${result.subjectName ?? '-'}\nNilai: Menunggu penilaian esai\nPengawasan: $summary'
+          : '${result.subjectName ?? '-'}\nNilai: ${result.score} | Benar: ${result.correct} | Salah: ${result.wrong} | Total: $total\nPengawasan: $summary',
       status: 'Durasi: ${_formatDuration(result.duration)}',
     );
   }
@@ -617,6 +622,7 @@ _LatestResultView? _resolveLatestResult({
           duration: sessionLatest.duration,
           cheatScore: sessionLatest.cheatScore,
           riskLevel: sessionLatest.riskLevel,
+          gradingStatus: item.gradingStatus,
           examTitle: item.examTitle ?? sessionLatest.examTitle,
           subjectName: item.subjectName ?? sessionLatest.subjectName,
           username: item.username ?? sessionLatest.username,

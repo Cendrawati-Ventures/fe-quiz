@@ -440,10 +440,16 @@ class _AdminResultMonitoringScreenState
     final subtitle = StringBuffer()
       ..write('Mulai: $startedAt\n')
       ..write('Selesai: $endedAt\n')
-      ..write('Durasi: ${_formatDuration(result.duration)}\n')
-      ..write('Nilai: ${result.score} | ')
-      ..write('Benar: ${result.correct} | ')
-      ..write('Salah: ${result.wrong}\n')
+      ..write('Durasi: ${_formatDuration(result.duration)}\n');
+    if (result.isPendingGrading) {
+      subtitle.write('Nilai: Menunggu penilaian esai\n');
+    } else {
+      subtitle
+        ..write('Nilai: ${result.score} | ')
+        ..write('Benar: ${result.correct} | ')
+        ..write('Salah: ${result.wrong}\n');
+    }
+    subtitle
       ..write('Risiko: ${riskLevelLabel(result.riskLevel)}\n')
       ..write('Info Pengawasan: ${_proctoringSummary(result)}');
 
@@ -630,6 +636,8 @@ enum _AnswerStatus {
   correct,
   wrong,
   unanswered,
+  pending,
+  graded,
 }
 
 class _AdminAnswerReviewData {
@@ -655,6 +663,8 @@ class _AdminAnswerReviewDialog extends ConsumerStatefulWidget {
 class _AdminAnswerReviewDialogState
     extends ConsumerState<_AdminAnswerReviewDialog> {
   late Future<_AdminAnswerReviewData> _reviewFuture;
+  final Map<String, String> _essayScoreDrafts = <String, String>{};
+  String? _gradingAnswerId;
 
   @override
   void initState() {
@@ -711,6 +721,12 @@ class _AdminAnswerReviewDialogState
       AdminQuestion question, AdminAttemptAnswer? answer) {
     if (answer == null || _isEmptyAnswer(answer.answer)) {
       return _AnswerStatus.unanswered;
+    }
+
+    if (question.type == QuestionType.essay) {
+      return answer.awardedWeight == null
+          ? _AnswerStatus.pending
+          : _AnswerStatus.graded;
     }
 
     if (answer.isCorrect == true) {
@@ -1156,6 +1172,14 @@ class _AdminAnswerReviewDialogState
     required AdminQuestion question,
     required AdminAttemptAnswer? answer,
   }) {
+    if (question.type == QuestionType.essay) {
+      return _buildEssayQuestionReview(
+        context: context,
+        question: question,
+        answer: answer,
+      );
+    }
+
     if (question.type == QuestionType.group) {
       return _buildGroupQuestionReview(
         context: context,
@@ -1169,6 +1193,103 @@ class _AdminAnswerReviewDialogState
       question: question,
       participantAnswer: answer?.answer,
     );
+  }
+
+  Widget _buildEssayQuestionReview({
+    required BuildContext context,
+    required AdminQuestion question,
+    required AdminAttemptAnswer? answer,
+  }) {
+    final answerId = answer?.id ?? '';
+    final maxScore = question.weight;
+    final initialScore = answer?.awardedWeight?.toString() ?? '';
+    final isSaving = _gradingAnswerId == answerId && answerId.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _buildAnswerLine(
+          context: context,
+          label: 'Jawaban Peserta',
+          value: _formatRawValue(answer?.answer),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        TextFormField(
+          key: ValueKey<String>('essay-score-$answerId-$initialScore'),
+          initialValue: _essayScoreDrafts[answerId] ?? initialScore,
+          enabled: answerId.isNotEmpty && !isSaving,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            labelText: 'Nilai Esai',
+            hintText: '0 sampai $maxScore',
+            suffixText: '/ $maxScore',
+          ),
+          onChanged: (value) => _essayScoreDrafts[answerId] = value,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        FilledButton.icon(
+          onPressed: answerId.isEmpty || isSaving
+              ? null
+              : () => _saveEssayScore(
+                    answer: answer!,
+                    question: question,
+                  ),
+          icon: isSaving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.check_rounded),
+          label: Text(isSaving ? 'Menyimpan...' : 'Simpan Nilai Esai'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _saveEssayScore({
+    required AdminAttemptAnswer answer,
+    required AdminQuestion question,
+  }) async {
+    final raw =
+        (_essayScoreDrafts[answer.id] ?? answer.awardedWeight?.toString() ?? '')
+            .trim()
+            .replaceAll(',', '.');
+    final score = num.tryParse(raw);
+    final maxScore = question.weight;
+    if (score == null || score < 0 || score > maxScore) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nilai harus antara 0 dan $maxScore.')),
+      );
+      return;
+    }
+
+    setState(() => _gradingAnswerId = answer.id);
+    try {
+      await ref.read(examServiceProvider).gradeEssayAnswer(
+            answerId: answer.id,
+            score: score,
+          );
+      _essayScoreDrafts.remove(answer.id);
+      ref.invalidate(adminResultsProvider);
+      _reload();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nilai esai berhasil disimpan.')),
+      );
+    } on ApiError catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _gradingAnswerId = null);
+      }
+    }
   }
 
   String _formatRawValue(Object? value) {
@@ -1197,6 +1318,10 @@ class _AdminAnswerReviewDialogState
         return "Salah";
       case _AnswerStatus.unanswered:
         return "Tidak Dijawab";
+      case _AnswerStatus.pending:
+        return "Menunggu Nilai";
+      case _AnswerStatus.graded:
+        return "Sudah Dinilai";
     }
   }
 
@@ -1209,6 +1334,10 @@ class _AdminAnswerReviewDialogState
         return colorScheme.error;
       case _AnswerStatus.unanswered:
         return Colors.orange.shade700;
+      case _AnswerStatus.pending:
+        return Colors.orange.shade700;
+      case _AnswerStatus.graded:
+        return Colors.blue.shade700;
     }
   }
 
